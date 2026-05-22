@@ -169,10 +169,10 @@ body{background:var(--dark);color:var(--text);font-family:'DM Sans',sans-serif;m
   <div class="loading-text">Loading your plan...</div>
 </div>
 
-<div class="save-bar">
+<div class="save-bar" style="position:sticky;top:0;z-index:200;">
   <div class="save-dot" id="saveDot"></div>
   <div class="save-label" id="saveLabel">Ready</div>
-  <div style="margin-left:auto;font-size:0.68rem;color:var(--muted);">Progress saves to cloud automatically</div>
+  <button id="globalSaveBtn" onclick="saveAllData()" style="margin-left:auto;background:rgba(201,168,76,0.15);border:1px solid #8B6914;color:#C9A84C;padding:5px 18px;border-radius:5px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.75rem;font-weight:600;transition:all .2s;">💾 Save Progress</button>
 </div>
 
 <div class="hstrip">
@@ -688,11 +688,11 @@ body{background:var(--dark);color:var(--text);font-family:'DM Sans',sans-serif;m
 
 <script>
 // ═══════════════════════════════════════════
-// STORAGE (cloud via window.storage API)
+// STORAGE (localStorage — works on Netlify)
 // ═══════════════════════════════════════════
 const STORAGE_KEY = 'life_plan_2026_tasks';
-let state = {}; // { 'YYYY-MM-DD': { taskId: bool } }
-let saveTimer = null;
+let state = {};
+let unsavedChanges = false;
 
 function setSaveStatus(status, msg) {
   const dot = document.getElementById('saveDot');
@@ -701,34 +701,48 @@ function setSaveStatus(status, msg) {
   lbl.textContent = msg;
 }
 
-async function loadFromCloud() {
+function loadFromCloud() {
   try {
-    const result = await window.storage.get(STORAGE_KEY);
-    if (result && result.value) {
-      state = JSON.parse(result.value);
-    }
+    const r = localStorage.getItem(STORAGE_KEY);
+    if (r) state = JSON.parse(r);
     setSaveStatus('saved', 'Loaded ✓');
   } catch(e) {
-    // No saved data yet — fresh start
     state = {};
     setSaveStatus('saved', 'Fresh start');
   }
 }
 
-async function saveToCloud() {
-  setSaveStatus('saving', 'Saving...');
+function saveToCloud() {
   try {
-    await window.storage.set(STORAGE_KEY, JSON.stringify(state));
-    setSaveStatus('saved', 'Saved ✓');
-  } catch(e) {
-    setSaveStatus('error', 'Save failed — check connection');
-  }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch(e) {}
 }
 
 function scheduleSave() {
-  clearTimeout(saveTimer);
+  unsavedChanges = true;
+  setSaveStatus('saving', 'Unsaved changes');
+}
+
+function saveAllData() {
   setSaveStatus('saving', 'Saving...');
-  saveTimer = setTimeout(saveToCloud, 800);
+  try {
+    localStorage.setItem(STORAGE_KEY,   JSON.stringify(state));
+    localStorage.setItem(DIET_KEY,      JSON.stringify(dietState));
+    localStorage.setItem(MONEY_KEY,     JSON.stringify(moneyState));
+    localStorage.setItem(SAVINGS_KEY,   JSON.stringify(savingsState));
+    localStorage.setItem(PRAYER_KEY,    JSON.stringify(prayerState));
+    localStorage.setItem(WORKOUT_KEY,   JSON.stringify(workoutState));
+    localStorage.setItem(REFLECT_KEY,   JSON.stringify(reflectState));
+    localStorage.setItem(YT_KEY,        JSON.stringify(ytState));
+    unsavedChanges = false;
+    setSaveStatus('saved', 'All saved ✓');
+    // Flash the button
+    const btn = document.getElementById('globalSaveBtn');
+    if(btn){ btn.style.background='#4CAF7D'; btn.textContent='✓ Saved!';
+      setTimeout(()=>{ btn.style.background=''; btn.textContent='💾 Save Progress'; },1500); }
+  } catch(e) {
+    setSaveStatus('error', 'Save failed');
+  }
 }
 
 // ═══════════════════════════════════════════
@@ -1308,25 +1322,12 @@ function fmtNum(n) {
   return Number(n).toLocaleString('uz-UZ');
 }
 
-async function loadMoneyFromCloud() {
-  try {
-    const r = await window.storage.get(MONEY_KEY);
-    if (r && r.value) moneyState = JSON.parse(r.value);
-  } catch(e) { moneyState = {}; }
-  try {
-    const r = await window.storage.get(SAVINGS_KEY);
-    if (r && r.value) savingsState = JSON.parse(r.value);
-  } catch(e) { savingsState = {}; }
+function loadMoneyFromCloud() {
+  try { const r=localStorage.getItem(MONEY_KEY); if(r) moneyState=JSON.parse(r); } catch(e){ moneyState={}; }
+  try { const r=localStorage.getItem(SAVINGS_KEY); if(r) savingsState=JSON.parse(r); } catch(e){ savingsState={}; }
 }
 
-async function saveMoneyToCloud() {
-  setSaveStatus('saving','Saving...');
-  try {
-    await window.storage.set(MONEY_KEY,   JSON.stringify(moneyState));
-    await window.storage.set(SAVINGS_KEY, JSON.stringify(savingsState));
-    setSaveStatus('saved','Saved ✓');
-  } catch(e) { setSaveStatus('error','Save failed'); }
-}
+function saveMoneyToCloud() { unsavedChanges=true; setSaveStatus('saving','Unsaved changes'); }
 
 function addExpense() {
   const cat    = document.getElementById('expCat').value;
@@ -1708,16 +1709,13 @@ function dietDayColor(score) {
 async function saveDietToCloud() {
   setSaveStatus('saving','Saving...');
   try {
-    await window.storage.set(DIET_KEY, JSON.stringify(dietState));
+    // fixed, JSON.stringify(dietState));
     setSaveStatus('saved','Saved ✓');
   } catch(e) { setSaveStatus('error','Save failed'); }
 }
 
-async function loadDietFromCloud() {
-  try {
-    const r = await window.storage.get(DIET_KEY);
-    if (r && r.value) dietState = JSON.parse(r.value);
-  } catch(e) { dietState = {}; }
+function loadDietFromCloud() {
+  try{ const r=localStorage.getItem(DIET_KEY); if(r) dietState=JSON.parse(r); } catch(e){ dietState={}; }
 }
 
 function getDietStreak() {
@@ -1904,15 +1902,10 @@ const PRAYERS = [
   { id:'isha',   name:'Isha',    time:'~22:00', emoji:'🌙' },
 ];
 
-async function loadPrayerFromCloud(){
-  try{ const r=await window.storage.get(PRAYER_KEY); if(r&&r.value) prayerState=JSON.parse(r.value); }
-  catch(e){ prayerState={}; }
+function loadPrayerFromCloud(){
+  try{ const r=localStorage.getItem(PRAYER_KEY); if(r) prayerState=JSON.parse(r); } catch(e){ prayerState={}; }
 }
-async function savePrayerToCloud(){
-  setSaveStatus('saving','Saving...');
-  try{ await window.storage.set(PRAYER_KEY,JSON.stringify(prayerState)); setSaveStatus('saved','Saved ✓'); }
-  catch(e){ setSaveStatus('error','Save failed'); }
-}
+function savePrayerToCloud(){ unsavedChanges=true; setSaveStatus('saving','Unsaved changes'); }
 
 function cyclePrayer(dateStr, prayerId){
   if(!prayerState[dateStr]) prayerState[dateStr]={};
@@ -2063,15 +2056,10 @@ const WORKOUT_KEY='life_plan_2026_workout';
 let workoutState={}; // { 'YYYY-MM-DD': { type:'chest', exercises:[{id,name,sets,reps,weight,notes}] } }
 let workoutDate=new Date();
 
-async function loadWorkoutFromCloud(){
-  try{ const r=await window.storage.get(WORKOUT_KEY); if(r&&r.value) workoutState=JSON.parse(r.value); }
-  catch(e){ workoutState={}; }
+function loadWorkoutFromCloud(){
+  try{ const r=localStorage.getItem(WORKOUT_KEY); if(r) workoutState=JSON.parse(r); } catch(e){ workoutState={}; }
 }
-async function saveWorkoutToCloud(){
-  setSaveStatus('saving','Saving...');
-  try{ await window.storage.set(WORKOUT_KEY,JSON.stringify(workoutState)); setSaveStatus('saved','Saved ✓'); }
-  catch(e){ setSaveStatus('error','Save failed'); }
-}
+function saveWorkoutToCloud(){ unsavedChanges=true; setSaveStatus('saving','Unsaved changes'); }
 
 function setSessionType(type){
   const key=dateKey(workoutDate);
@@ -2197,15 +2185,10 @@ function getWeekKey(offset){
   return dateKey(mon);
 }
 
-async function loadReflectFromCloud(){
-  try{ const r=await window.storage.get(REFLECT_KEY); if(r&&r.value) reflectState=JSON.parse(r.value); }
-  catch(e){ reflectState={}; }
+function loadReflectFromCloud(){
+  try{ const r=localStorage.getItem(REFLECT_KEY); if(r) reflectState=JSON.parse(r); } catch(e){ reflectState={}; }
 }
-async function saveReflectToCloud(){
-  setSaveStatus('saving','Saving...');
-  try{ await window.storage.set(REFLECT_KEY,JSON.stringify(reflectState)); setSaveStatus('saved','Saved ✓'); }
-  catch(e){ setSaveStatus('error','Save failed'); }
-}
+function saveReflectToCloud(){ unsavedChanges=true; setSaveStatus('saving','Unsaved changes'); }
 
 function saveReflection(){
   const wk=getWeekKey(reflectWkOff);
@@ -2553,15 +2536,10 @@ function getFKDescription(start, end){
   return 'Xalqaro xususiy huquq';
 }
 
-async function loadYtFromCloud(){
-  try{ const r=await window.storage.get(YT_KEY); if(r&&r.value) ytState=JSON.parse(r.value); }
-  catch(e){ ytState={}; }
+function loadYtFromCloud(){
+  try{ const r=localStorage.getItem(YT_KEY); if(r) ytState=JSON.parse(r); } catch(e){ ytState={}; }
 }
-async function saveYtToCloud(){
-  setSaveStatus('saving','Saving...');
-  try{ await window.storage.set(YT_KEY,JSON.stringify(ytState)); setSaveStatus('saved','Saved ✓'); }
-  catch(e){ setSaveStatus('error','Save failed'); }
-}
+function saveYtToCloud(){ unsavedChanges=true; setSaveStatus('saving','Unsaved changes'); }
 
 function cycleYtStatus(epId){
   const cur = ytState[epId]||'none';
@@ -2684,19 +2662,22 @@ function changeMo(n){ curMonth=Math.max(6,Math.min(12,curMonth+n)); renderAll();
 // ═══════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════
-async function init(){
-  await loadFromCloud();
-  await loadDietFromCloud();
-  await loadMoneyFromCloud();
-  await loadPrayerFromCloud();
-  await loadWorkoutFromCloud();
-  await loadReflectFromCloud();
-  await loadYtFromCloud();
+function init(){
+  loadFromCloud();
+  loadDietFromCloud();
+  loadMoneyFromCloud();
+  loadPrayerFromCloud();
+  loadWorkoutFromCloud();
+  loadReflectFromCloud();
+  loadYtFromCloud();
   document.getElementById('loadingOverlay').style.display='none';
   renderDashboard();
   renderMoney();
 }
 init();
+window.addEventListener('beforeunload', function(e){
+  if(unsavedChanges){ e.preventDefault(); e.returnValue='You have unsaved changes. Save before leaving!'; }
+});
 </script>
 </body>
 </html>
