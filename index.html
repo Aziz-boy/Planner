@@ -686,62 +686,102 @@ body{background:var(--dark);color:var(--text);font-family:'DM Sans',sans-serif;m
   <div class="vis-grid" id="visGrid"></div>
 </div>
 
-<script>
+<script type="module">
 // ═══════════════════════════════════════════
-// STORAGE (localStorage — works on Netlify)
 // ═══════════════════════════════════════════
-const STORAGE_KEY = 'life_plan_2026_tasks';
+// FIREBASE CONFIG + STORAGE
+// ═══════════════════════════════════════════
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA7AwtfRArmS-hz0uIf4teeg6mp-kduiKk",
+  authDomain: "life-planner-c5205.firebaseapp.com",
+  projectId: "life-planner-c5205",
+  storageBucket: "life-planner-c5205.firebasestorage.app",
+  messagingSenderId: "114850967336",
+  appId: "1:114850967336:web:af0e75368b3ccb075aea1d"
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const db    = getFirestore(fbApp);
+const USER_DOC = 'azizbek2026'; // your personal save slot
+
+const STORAGE_KEY = 'tasks';
 let state = {};
 let unsavedChanges = false;
 
 function setSaveStatus(status, msg) {
   const dot = document.getElementById('saveDot');
   const lbl = document.getElementById('saveLabel');
-  dot.className = 'save-dot ' + status;
-  lbl.textContent = msg;
+  if(dot) dot.className = 'save-dot ' + status;
+  if(lbl) lbl.textContent = msg;
 }
 
-function loadFromCloud() {
+async function loadFromCloud() {
+  setSaveStatus('saving', 'Loading...');
   try {
-    const r = localStorage.getItem(STORAGE_KEY);
-    if (r) state = JSON.parse(r);
+    const snap = await getDoc(doc(db, 'lifeplanner', USER_DOC));
+    if (snap.exists()) {
+      const d = snap.data();
+      state        = JSON.parse(d.tasks        || '{}');
+      dietState    = JSON.parse(d.diet         || '{}');
+      moneyState   = JSON.parse(d.money        || '{}');
+      savingsState = JSON.parse(d.savings      || '{}');
+      prayerState  = JSON.parse(d.prayer       || '{}');
+      workoutState = JSON.parse(d.workout      || '{}');
+      reflectState = JSON.parse(d.reflect      || '{}');
+      ytState      = JSON.parse(d.youtube      || '{}');
+    }
     setSaveStatus('saved', 'Loaded ✓');
   } catch(e) {
-    state = {};
-    setSaveStatus('saved', 'Fresh start');
+    console.error('Load error:', e);
+    setSaveStatus('error', 'Load failed — using local');
+    // Fallback to localStorage
+    try { const r=localStorage.getItem('tasks'); if(r) state=JSON.parse(r); } catch(e2){}
   }
 }
 
-function saveToCloud() {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch(e) {}
-}
+function saveToCloud() {} // stub — real save via saveAllData
 
 function scheduleSave() {
   unsavedChanges = true;
-  setSaveStatus('saving', 'Unsaved changes');
+  setSaveStatus('saving', 'Unsaved — click Save!');
 }
 
-function saveAllData() {
-  setSaveStatus('saving', 'Saving...');
+async function saveAllData() {
+  setSaveStatus('saving', 'Saving to cloud...');
+  const btn = document.getElementById('globalSaveBtn');
+  if(btn){ btn.disabled=true; btn.textContent='Saving...'; }
   try {
-    localStorage.setItem(STORAGE_KEY,   JSON.stringify(state));
-    localStorage.setItem(DIET_KEY,      JSON.stringify(dietState));
-    localStorage.setItem(MONEY_KEY,     JSON.stringify(moneyState));
-    localStorage.setItem(SAVINGS_KEY,   JSON.stringify(savingsState));
-    localStorage.setItem(PRAYER_KEY,    JSON.stringify(prayerState));
-    localStorage.setItem(WORKOUT_KEY,   JSON.stringify(workoutState));
-    localStorage.setItem(REFLECT_KEY,   JSON.stringify(reflectState));
-    localStorage.setItem(YT_KEY,        JSON.stringify(ytState));
+    await setDoc(doc(db, 'lifeplanner', USER_DOC), {
+      tasks:   JSON.stringify(state),
+      diet:    JSON.stringify(dietState),
+      money:   JSON.stringify(moneyState),
+      savings: JSON.stringify(savingsState),
+      prayer:  JSON.stringify(prayerState),
+      workout: JSON.stringify(workoutState),
+      reflect: JSON.stringify(reflectState),
+      youtube: JSON.stringify(ytState),
+      savedAt: new Date().toISOString(),
+    });
+    // Also save to localStorage as backup
+    localStorage.setItem('tasks',   JSON.stringify(state));
+    localStorage.setItem('diet',    JSON.stringify(dietState));
+    localStorage.setItem('money',   JSON.stringify(moneyState));
+    localStorage.setItem('savings', JSON.stringify(savingsState));
+    localStorage.setItem('prayer',  JSON.stringify(prayerState));
+    localStorage.setItem('workout', JSON.stringify(workoutState));
+    localStorage.setItem('reflect', JSON.stringify(reflectState));
+    localStorage.setItem('youtube', JSON.stringify(ytState));
     unsavedChanges = false;
-    setSaveStatus('saved', 'All saved ✓');
-    // Flash the button
-    const btn = document.getElementById('globalSaveBtn');
-    if(btn){ btn.style.background='#4CAF7D'; btn.textContent='✓ Saved!';
-      setTimeout(()=>{ btn.style.background=''; btn.textContent='💾 Save Progress'; },1500); }
+    setSaveStatus('saved', 'Saved to cloud ✓');
+    if(btn){ btn.style.background='#4CAF7D'; btn.style.color='#000'; btn.textContent='✓ Saved!'; btn.disabled=false;
+      setTimeout(()=>{ btn.style.background=''; btn.style.color=''; btn.textContent='💾 Save Progress'; },2000); }
   } catch(e) {
-    setSaveStatus('error', 'Save failed');
+    console.error('Save error:', e);
+    setSaveStatus('error', 'Cloud save failed!');
+    if(btn){ btn.style.background='#D94A4A'; btn.textContent='❌ Failed — retry'; btn.disabled=false; }
   }
 }
 
@@ -1322,10 +1362,7 @@ function fmtNum(n) {
   return Number(n).toLocaleString('uz-UZ');
 }
 
-function loadMoneyFromCloud() {
-  try { const r=localStorage.getItem(MONEY_KEY); if(r) moneyState=JSON.parse(r); } catch(e){ moneyState={}; }
-  try { const r=localStorage.getItem(SAVINGS_KEY); if(r) savingsState=JSON.parse(r); } catch(e){ savingsState={}; }
-}
+function loadMoneyFromCloud() { /* loaded via Firebase */ }
 
 function saveMoneyToCloud() { unsavedChanges=true; setSaveStatus('saving','Unsaved changes'); }
 
@@ -1715,7 +1752,7 @@ async function saveDietToCloud() {
 }
 
 function loadDietFromCloud() {
-  try{ const r=localStorage.getItem(DIET_KEY); if(r) dietState=JSON.parse(r); } catch(e){ dietState={}; }
+  // loaded via Firebase loadFromCloud()
 }
 
 function getDietStreak() {
@@ -1903,7 +1940,7 @@ const PRAYERS = [
 ];
 
 function loadPrayerFromCloud(){
-  try{ const r=localStorage.getItem(PRAYER_KEY); if(r) prayerState=JSON.parse(r); } catch(e){ prayerState={}; }
+  // loaded via Firebase loadFromCloud()
 }
 function savePrayerToCloud(){ unsavedChanges=true; setSaveStatus('saving','Unsaved changes'); }
 
@@ -2057,7 +2094,7 @@ let workoutState={}; // { 'YYYY-MM-DD': { type:'chest', exercises:[{id,name,sets
 let workoutDate=new Date();
 
 function loadWorkoutFromCloud(){
-  try{ const r=localStorage.getItem(WORKOUT_KEY); if(r) workoutState=JSON.parse(r); } catch(e){ workoutState={}; }
+  // loaded via Firebase loadFromCloud()
 }
 function saveWorkoutToCloud(){ unsavedChanges=true; setSaveStatus('saving','Unsaved changes'); }
 
@@ -2186,7 +2223,7 @@ function getWeekKey(offset){
 }
 
 function loadReflectFromCloud(){
-  try{ const r=localStorage.getItem(REFLECT_KEY); if(r) reflectState=JSON.parse(r); } catch(e){ reflectState={}; }
+  // loaded via Firebase loadFromCloud()
 }
 function saveReflectToCloud(){ unsavedChanges=true; setSaveStatus('saving','Unsaved changes'); }
 
@@ -2537,7 +2574,7 @@ function getFKDescription(start, end){
 }
 
 function loadYtFromCloud(){
-  try{ const r=localStorage.getItem(YT_KEY); if(r) ytState=JSON.parse(r); } catch(e){ ytState={}; }
+  // loaded via Firebase loadFromCloud()
 }
 function saveYtToCloud(){ unsavedChanges=true; setSaveStatus('saving','Unsaved changes'); }
 
@@ -2662,8 +2699,8 @@ function changeMo(n){ curMonth=Math.max(6,Math.min(12,curMonth+n)); renderAll();
 // ═══════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════
-function init(){
-  loadFromCloud();
+async function init(){
+  await loadFromCloud();
   loadDietFromCloud();
   loadMoneyFromCloud();
   loadPrayerFromCloud();
