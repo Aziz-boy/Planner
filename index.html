@@ -707,9 +707,127 @@ const fbApp = initializeApp(firebaseConfig);
 const db    = getFirestore(fbApp);
 const USER_DOC = 'azizbek2026'; // your personal save slot
 
-const STORAGE_KEY = 'tasks';
-let state = {};
+// Expose Firebase functions to global scope so onclick works
+window._fbDb = db;
+window._fbDoc = doc;
+window._fbSetDoc = setDoc;
+window._fbGetDoc = getDoc;
+
+window.saveAllData = async function() {
+  const state        = window._appState;
+  const dietState    = window._dietState;
+  const moneyState   = window._moneyState;
+  const savingsState = window._savingsState;
+  const prayerState  = window._prayerState;
+  const workoutState = window._workoutState;
+  const reflectState = window._reflectState;
+  const ytState      = window._ytState;
+
+  const btn = document.getElementById('globalSaveBtn');
+  if(btn){ btn.disabled=true; btn.textContent='Saving...'; }
+  const dot = document.getElementById('saveDot');
+  const lbl = document.getElementById('saveLabel');
+  if(dot) dot.className='save-dot saving';
+  if(lbl) lbl.textContent='Saving to cloud...';
+  try {
+    await window._fbSetDoc(window._fbDoc(window._fbDb,'lifeplanner','azizbek2026'), {
+      tasks:   JSON.stringify(state||{}),
+      diet:    JSON.stringify(dietState||{}),
+      money:   JSON.stringify(moneyState||{}),
+      savings: JSON.stringify(savingsState||{}),
+      prayer:  JSON.stringify(prayerState||{}),
+      workout: JSON.stringify(workoutState||{}),
+      reflect: JSON.stringify(reflectState||{}),
+      youtube: JSON.stringify(ytState||{}),
+      savedAt: new Date().toISOString(),
+    });
+    // backup to localStorage
+    localStorage.setItem('tasks',   JSON.stringify(state||{}));
+    localStorage.setItem('diet',    JSON.stringify(dietState||{}));
+    localStorage.setItem('money',   JSON.stringify(moneyState||{}));
+    localStorage.setItem('savings', JSON.stringify(savingsState||{}));
+    localStorage.setItem('prayer',  JSON.stringify(prayerState||{}));
+    localStorage.setItem('workout', JSON.stringify(workoutState||{}));
+    localStorage.setItem('reflect', JSON.stringify(reflectState||{}));
+    localStorage.setItem('youtube', JSON.stringify(ytState||{}));
+    if(dot) dot.className='save-dot saved';
+    if(lbl) lbl.textContent='Saved to cloud ✓';
+    if(btn){ btn.style.background='#4CAF7D'; btn.style.color='#000';
+      btn.textContent='✓ Saved!'; btn.disabled=false;
+      setTimeout(()=>{ btn.style.background=''; btn.style.color='';
+        btn.textContent='💾 Save Progress'; },2000); }
+  } catch(e) {
+    console.error('Save error:',e);
+    if(dot) dot.className='save-dot error';
+    if(lbl) lbl.textContent='Cloud save failed!';
+    if(btn){ btn.style.background='#D94A4A'; btn.textContent='❌ Retry'; btn.disabled=false; }
+  }
+};
+
+window._loadFromFirebase = async function() {
+  try {
+    const snap = await window._fbGetDoc(window._fbDoc(window._fbDb,'lifeplanner','azizbek2026'));
+    if(snap.exists()) {
+      const d = snap.data();
+      window._appState    = JSON.parse(d.tasks   ||'{}');
+      window._dietState   = JSON.parse(d.diet    ||'{}');
+      window._moneyState  = JSON.parse(d.money   ||'{}');
+      window._savingsState= JSON.parse(d.savings ||'{}');
+      window._prayerState = JSON.parse(d.prayer  ||'{}');
+      window._workoutState= JSON.parse(d.workout ||'{}');
+      window._reflectState= JSON.parse(d.reflect ||'{}');
+      window._ytState     = JSON.parse(d.youtube ||'{}');
+    }
+    const dot=document.getElementById('saveDot');
+    const lbl=document.getElementById('saveLabel');
+    if(dot) dot.className='save-dot saved';
+    if(lbl) lbl.textContent='Loaded from cloud ✓';
+    // Signal app logic that data is ready
+    if(window._onFirebaseLoaded) window._onFirebaseLoaded();
+  } catch(e) {
+    console.error('Load error:',e);
+    const lbl=document.getElementById('saveLabel');
+    if(lbl) lbl.textContent='Using local backup';
+    if(window._onFirebaseLoaded) window._onFirebaseLoaded();
+  }
+};
+
+// Trigger load after DOM ready
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded', ()=>window._loadFromFirebase());
+} else {
+  window._loadFromFirebase();
+}
+</script>
+<script>
+// State lives on window so Firebase module can access it
+window._appState     = {};
+window._dietState    = {};
+window._moneyState   = {};
+window._savingsState = {};
+window._prayerState  = {};
+window._workoutState = {};
+window._reflectState = {};
+window._ytState      = {};
+
+// Local proxy references (reassigned after Firebase load)
+let state        = window._appState;
 let unsavedChanges = false;
+
+// Called by Firebase module once data is loaded
+window._onFirebaseLoaded = function() {
+  state        = window._appState;
+  dietState    = window._dietState;
+  moneyState   = window._moneyState;
+  savingsState = window._savingsState;
+  prayerState  = window._prayerState;
+  workoutState = window._workoutState;
+  reflectState = window._reflectState;
+  ytState      = window._ytState;
+  document.getElementById('loadingOverlay').style.display='none';
+  renderDashboard();
+  renderMoney();
+};
 
 function setSaveStatus(status, msg) {
   const dot = document.getElementById('saveDot');
@@ -718,72 +836,25 @@ function setSaveStatus(status, msg) {
   if(lbl) lbl.textContent = msg;
 }
 
-async function loadFromCloud() {
-  setSaveStatus('saving', 'Loading...');
-  try {
-    const snap = await getDoc(doc(db, 'lifeplanner', USER_DOC));
-    if (snap.exists()) {
-      const d = snap.data();
-      state        = JSON.parse(d.tasks        || '{}');
-      dietState    = JSON.parse(d.diet         || '{}');
-      moneyState   = JSON.parse(d.money        || '{}');
-      savingsState = JSON.parse(d.savings      || '{}');
-      prayerState  = JSON.parse(d.prayer       || '{}');
-      workoutState = JSON.parse(d.workout      || '{}');
-      reflectState = JSON.parse(d.reflect      || '{}');
-      ytState      = JSON.parse(d.youtube      || '{}');
-    }
-    setSaveStatus('saved', 'Loaded ✓');
-  } catch(e) {
-    console.error('Load error:', e);
-    setSaveStatus('error', 'Load failed — using local');
-    // Fallback to localStorage
-    try { const r=localStorage.getItem('tasks'); if(r) state=JSON.parse(r); } catch(e2){}
-  }
-}
+// loadFromCloud handled by Firebase module above
 
 function saveToCloud() {} // stub — real save via saveAllData
 
 function scheduleSave() {
   unsavedChanges = true;
+  // Sync to window globals so Firebase module can access latest state
+  window._appState     = state;
+  window._dietState    = dietState;
+  window._moneyState   = moneyState;
+  window._savingsState = savingsState;
+  window._prayerState  = prayerState;
+  window._workoutState = workoutState;
+  window._reflectState = reflectState;
+  window._ytState      = ytState;
   setSaveStatus('saving', 'Unsaved — click Save!');
 }
 
-async function saveAllData() {
-  setSaveStatus('saving', 'Saving to cloud...');
-  const btn = document.getElementById('globalSaveBtn');
-  if(btn){ btn.disabled=true; btn.textContent='Saving...'; }
-  try {
-    await setDoc(doc(db, 'lifeplanner', USER_DOC), {
-      tasks:   JSON.stringify(state),
-      diet:    JSON.stringify(dietState),
-      money:   JSON.stringify(moneyState),
-      savings: JSON.stringify(savingsState),
-      prayer:  JSON.stringify(prayerState),
-      workout: JSON.stringify(workoutState),
-      reflect: JSON.stringify(reflectState),
-      youtube: JSON.stringify(ytState),
-      savedAt: new Date().toISOString(),
-    });
-    // Also save to localStorage as backup
-    localStorage.setItem('tasks',   JSON.stringify(state));
-    localStorage.setItem('diet',    JSON.stringify(dietState));
-    localStorage.setItem('money',   JSON.stringify(moneyState));
-    localStorage.setItem('savings', JSON.stringify(savingsState));
-    localStorage.setItem('prayer',  JSON.stringify(prayerState));
-    localStorage.setItem('workout', JSON.stringify(workoutState));
-    localStorage.setItem('reflect', JSON.stringify(reflectState));
-    localStorage.setItem('youtube', JSON.stringify(ytState));
-    unsavedChanges = false;
-    setSaveStatus('saved', 'Saved to cloud ✓');
-    if(btn){ btn.style.background='#4CAF7D'; btn.style.color='#000'; btn.textContent='✓ Saved!'; btn.disabled=false;
-      setTimeout(()=>{ btn.style.background=''; btn.style.color=''; btn.textContent='💾 Save Progress'; },2000); }
-  } catch(e) {
-    console.error('Save error:', e);
-    setSaveStatus('error', 'Cloud save failed!');
-    if(btn){ btn.style.background='#D94A4A'; btn.textContent='❌ Failed — retry'; btn.disabled=false; }
-  }
-}
+// saveAllData handled by Firebase module (window.saveAllData)
 
 // ═══════════════════════════════════════════
 // DATA DEFINITIONS
@@ -2699,17 +2770,15 @@ function changeMo(n){ curMonth=Math.max(6,Math.min(12,curMonth+n)); renderAll();
 // ═══════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════
-async function init(){
-  await loadFromCloud();
+function init(){
+  // Data loaded by Firebase module via window._onFirebaseLoaded
   loadDietFromCloud();
   loadMoneyFromCloud();
   loadPrayerFromCloud();
   loadWorkoutFromCloud();
   loadReflectFromCloud();
   loadYtFromCloud();
-  document.getElementById('loadingOverlay').style.display='none';
-  renderDashboard();
-  renderMoney();
+  // rendering triggered by _onFirebaseLoaded
 }
 init();
 window.addEventListener('beforeunload', function(e){
