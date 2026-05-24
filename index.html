@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>My 2026 Life Plan</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <style>
 :root {
   --gold:#C9A84C; --gold-light:#F0D080; --gold-dark:#8B6914;
@@ -396,11 +397,46 @@ input:focus,select:focus,textarea:focus{
 input::placeholder,textarea::placeholder{ color: var(--muted); opacity:0.7; }
 select option{ background: #0F0F14; color: var(--text); }
 
+/* NAV ICON BADGES */
+.nav-icon{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:20px;height:20px;border-radius:5px;
+  background:rgba(201,168,76,0.07);
+  border:1px solid rgba(201,168,76,0.12);
+  font-size:0.62rem;margin-right:4px;
+  transition:all .2s;vertical-align:middle;
+  box-shadow:0 1px 5px rgba(0,0,0,0.4);
+  color:var(--muted);
+}
+.ntab.active .nav-icon{
+  background:linear-gradient(145deg,rgba(201,168,76,0.24),rgba(201,168,76,0.08));
+  border-color:rgba(201,168,76,0.42);
+  color:var(--gold);
+  box-shadow:0 1px 6px rgba(0,0,0,0.5),0 0 12px rgba(201,168,76,0.16);
+}
+.ntab:hover .nav-icon{
+  background:rgba(201,168,76,0.12);
+  border-color:rgba(201,168,76,0.24);
+  color:var(--text);
+}
+
+/* SECTION ICON BADGES */
+.sec-icon{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:36px;height:36px;border-radius:10px;flex-shrink:0;
+  background:linear-gradient(145deg,rgba(201,168,76,0.18),rgba(201,168,76,0.04));
+  border:1px solid rgba(201,168,76,0.30);
+  font-size:0.9rem;color:var(--gold);
+  box-shadow:0 4px 16px rgba(0,0,0,0.55),0 0 18px rgba(201,168,76,0.09),0 1px 0 rgba(255,255,255,0.06) inset;
+  filter:drop-shadow(0 2px 6px rgba(0,0,0,0.5));
+}
+
 /* SECTION TITLES */
 .sec-title{
   font-family:'Playfair Display',serif;font-size:1.2rem;color:var(--gold);
   margin-bottom:3px;letter-spacing:0.01em;
   text-shadow: 0 0 32px rgba(201,168,76,0.22), 0 2px 6px rgba(0,0,0,0.4);
+  display:flex;align-items:center;gap:10px;
 }
 .sec-sub{font-size:0.75rem;color:var(--muted);margin-bottom:18px;opacity:0.85;}
 
@@ -533,6 +569,8 @@ hr{ border-color: rgba(201,168,76,0.07); }
   /* Nav tabs: tighter padding */
   .nav{padding:0 2px;}
   .ntab{padding:10px 9px;font-size:0.7rem;}
+  .nav-icon{width:16px;height:16px;font-size:0.55rem;margin-right:3px;}
+  .sec-icon{width:30px;height:30px;border-radius:8px;font-size:0.78rem;}
 
   /* Section body */
   .sec{padding:14px 10px;}
@@ -718,23 +756,23 @@ hr{ border-color: rgba(201,168,76,0.07); }
 </div>
 
 <div class="nav">
-  <div class="ntab active" onclick="showSec('dash',this)">🏠 Dashboard</div>
-  <div class="ntab" onclick="showSec('daily',this)">📅 Daily</div>
-  <div class="ntab" onclick="showSec('weekly',this)">📋 Weekly</div>
-  <div class="ntab" onclick="showSec('monthly',this)">🗓️ Monthly</div>
-  <div class="ntab" onclick="showSec('tracker',this)">📈 Tracker</div>
-  <div class="ntab" onclick="showSec('vision',this)">🎯 Vision</div>
-  <div class="ntab" onclick="showSec('diet',this)">🥗 Diet</div>
-  <div class="ntab" onclick="showSec('money',this)">💰 Money</div>
-  <div class="ntab" onclick="showSec('prayer',this)">🕌 Prayer</div>
-  <div class="ntab" onclick="showSec('workout',this)">🏋️ Workout</div>
-  <div class="ntab" onclick="showSec('reflect',this)">🧠 Reflection</div>
-  <div class="ntab" onclick="showSec('youtube',this)">🎬 YouTube</div>
+  <div class="ntab active" onclick="showSec('dash',this)"><span class="nav-icon"><i class="fa-solid fa-gauge-high"></i></span> Dashboard</div>
+  <div class="ntab" onclick="showSec('daily',this)"><span class="nav-icon"><i class="fa-solid fa-calendar-day"></i></span> Daily</div>
+  <div class="ntab" onclick="showSec('weekly',this)"><span class="nav-icon"><i class="fa-solid fa-calendar-week"></i></span> Weekly</div>
+  <div class="ntab" onclick="showSec('monthly',this)"><span class="nav-icon"><i class="fa-solid fa-calendar"></i></span> Monthly</div>
+  <div class="ntab" onclick="showSec('tracker',this)"><span class="nav-icon"><i class="fa-solid fa-chart-line"></i></span> Tracker</div>
+  <div class="ntab" onclick="showSec('vision',this)"><span class="nav-icon"><i class="fa-solid fa-eye"></i></span> Vision</div>
+  <div class="ntab" onclick="showSec('diet',this)"><span class="nav-icon"><i class="fa-solid fa-leaf"></i></span> Diet</div>
+  <div class="ntab" onclick="showSec('money',this)"><span class="nav-icon"><i class="fa-solid fa-coins"></i></span> Money</div>
+  <div class="ntab" onclick="showSec('prayer',this)"><span class="nav-icon"><i class="fa-solid fa-mosque"></i></span> Prayer</div>
+  <div class="ntab" onclick="showSec('workout',this)"><span class="nav-icon"><i class="fa-solid fa-dumbbell"></i></span> Workout</div>
+  <div class="ntab" onclick="showSec('reflect',this)"><span class="nav-icon"><i class="fa-solid fa-brain"></i></span> Reflection</div>
+  <div class="ntab" onclick="showSec('youtube',this)"><span class="nav-icon"><i class="fa-brands fa-youtube"></i></span> YouTube</div>
 </div>
 
 <!-- YOUTUBE -->
 <div class="sec" id="sec-youtube">
-  <div class="sec-title">🎬 YouTube Content Planner</div>
+  <div class="sec-title"><span class="sec-icon"><i class="fa-brands fa-youtube"></i></span> YouTube Content Planner</div>
   <div class="sec-sub">Fuqarolik Kodeksi — 1 video per week · 50 moddalar per video · 24 episodes total (Jun→Nov 2026)</div>
 
   <!-- Stats row -->
@@ -742,13 +780,13 @@ hr{ border-color: rgba(201,168,76,0.07); }
 
   <!-- This week's video -->
   <div class="task-card" style="margin-bottom:16px;border-color:rgba(255,96,128,0.3);">
-    <div class="task-card-hdr" style="color:#FF6080">🎥 This Week's Video</div>
+    <div class="task-card-hdr" style="color:#FF6080"><i class="fa-solid fa-video" style="margin-right:6px;"></i>This Week's Video</div>
     <div id="ytThisWeek"></div>
   </div>
 
   <!-- Full episode list -->
   <div class="task-card">
-    <div class="task-card-hdr" style="color:#FF6080">📋 All 24 Episodes — Full Schedule</div>
+    <div class="task-card-hdr" style="color:#FF6080"><i class="fa-solid fa-film" style="margin-right:6px;"></i>All 24 Episodes — Full Schedule</div>
     <div style="margin-top:4px;margin-bottom:12px;font-size:0.72rem;color:var(--muted);">Click any episode to mark as filmed ✓ or uploaded 🚀</div>
     <div id="ytEpisodeList"></div>
   </div>
@@ -770,12 +808,12 @@ hr{ border-color: rgba(201,168,76,0.07); }
   <!-- MIDDLE: Tasks + Prayer side by side -->
   <div id="dashMiddle" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
     <div class="task-card">
-      <div class="task-card-hdr" style="color:var(--gold)">📅 Today's Tasks</div>
+      <div class="task-card-hdr" style="color:var(--gold)"><i class="fa-solid fa-list-check" style="margin-right:6px;"></i>Today's Tasks</div>
       <div id="dashTasks"></div>
       <button class="btn btn-gold" onclick="showSec('daily',document.querySelectorAll('.ntab')[1])" style="width:100%;margin-top:10px;padding:8px;">Open Daily →</button>
     </div>
     <div class="task-card">
-      <div class="task-card-hdr" style="color:var(--gold)">🕌 Today's Prayers</div>
+      <div class="task-card-hdr" style="color:var(--gold)"><i class="fa-solid fa-mosque" style="margin-right:6px;"></i>Today's Prayers</div>
       <div id="dashPrayers"></div>
       <button class="btn btn-gold" onclick="showSec('prayer',document.querySelectorAll('.ntab')[8])" style="width:100%;margin-top:10px;padding:8px;">Open Prayer →</button>
     </div>
@@ -783,22 +821,22 @@ hr{ border-color: rgba(201,168,76,0.07); }
 
   <!-- STREAK WALL MINI -->
   <div class="task-card" style="margin-bottom:16px;">
-    <div class="task-card-hdr" style="color:var(--gold)">🔥 Habit Streaks</div>
+    <div class="task-card-hdr" style="color:var(--gold)"><i class="fa-solid fa-fire" style="margin-right:6px;"></i>Habit Streaks</div>
     <div id="dashStreaks" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:10px;"></div>
   </div>
 
   <!-- BOTTOM ROW: Money + Diet + Goals -->
   <div id="dashBottom" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
     <div class="task-card">
-      <div class="task-card-hdr" style="color:var(--gold)">💰 Money Today</div>
+      <div class="task-card-hdr" style="color:var(--gold)"><i class="fa-solid fa-coins" style="margin-right:6px;"></i>Money Today</div>
       <div id="dashMoney"></div>
     </div>
     <div class="task-card">
-      <div class="task-card-hdr" style="color:var(--gold)">🥗 Diet Today</div>
+      <div class="task-card-hdr" style="color:var(--gold)"><i class="fa-solid fa-leaf" style="margin-right:6px;"></i>Diet Today</div>
       <div id="dashDiet"></div>
     </div>
     <div class="task-card">
-      <div class="task-card-hdr" style="color:var(--gold)">📈 Top Goals</div>
+      <div class="task-card-hdr" style="color:var(--gold)"><i class="fa-solid fa-chart-line" style="margin-right:6px;"></i>Top Goals</div>
       <div id="dashGoals"></div>
     </div>
   </div>
@@ -806,7 +844,7 @@ hr{ border-color: rgba(201,168,76,0.07); }
 
 <!-- PRAYER -->
 <div class="sec" id="sec-prayer">
-  <div class="sec-title">🕌 Prayer Tracker</div>
+  <div class="sec-title"><span class="sec-icon"><i class="fa-solid fa-mosque"></i></span> Prayer Tracker</div>
   <div class="sec-sub">Track all 5 daily prayers — on time, late, or missed. Streaks auto-calculate.</div>
   <div class="day-nav">
     <button class="btn" onclick="changePrayerDay(-1)">← Prev</button>
@@ -850,7 +888,7 @@ hr{ border-color: rgba(201,168,76,0.07); }
 
 <!-- WORKOUT -->
 <div class="sec" id="sec-workout">
-  <div class="sec-title">🏋️ Workout Log</div>
+  <div class="sec-title"><span class="sec-icon"><i class="fa-solid fa-dumbbell"></i></span> Workout Log</div>
   <div class="sec-sub">Log exercises, sets, reps & weight. Track your strength progress over time.</div>
   <div class="day-nav">
     <button class="btn" onclick="changeWorkoutDay(-1)">← Prev</button>
@@ -910,14 +948,14 @@ hr{ border-color: rgba(201,168,76,0.07); }
 
   <!-- Personal bests -->
   <div class="task-card">
-    <div class="task-card-hdr" style="color:var(--gold)">🏆 Personal Bests (all time)</div>
+    <div class="task-card-hdr" style="color:var(--gold)"><i class="fa-solid fa-trophy" style="margin-right:6px;"></i>Personal Bests (all time)</div>
     <div id="personalBests"></div>
   </div>
 </div>
 
 <!-- REFLECTION -->
 <div class="sec" id="sec-reflect">
-  <div class="sec-title">🧠 Weekly Reflection</div>
+  <div class="sec-title"><span class="sec-icon"><i class="fa-solid fa-brain"></i></span> Weekly Reflection</div>
   <div class="sec-sub">Every Sunday — 5 minutes. Rate your week honestly across 5 areas. Watch yourself grow.</div>
 
   <div class="wk-nav" style="margin-bottom:20px;">
@@ -936,19 +974,19 @@ hr{ border-color: rgba(201,168,76,0.07); }
   <!-- Text fields -->
   <div id="reflectGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
     <div class="task-card">
-      <div class="task-card-hdr" style="color:var(--green)">✅ What went well this week?</div>
+      <div class="task-card-hdr" style="color:var(--green)"><i class="fa-solid fa-circle-check" style="margin-right:6px;"></i>What went well this week?</div>
       <textarea id="reflectWell" rows="4" placeholder="Write 3 wins from this week..." style="width:100%;background:var(--dark3);border:1px solid #333;color:var(--text);padding:10px;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:0.8rem;resize:vertical;margin-top:8px;"></textarea>
     </div>
     <div class="task-card">
-      <div class="task-card-hdr" style="color:var(--red)">❌ What didn't go well?</div>
+      <div class="task-card-hdr" style="color:var(--red)"><i class="fa-solid fa-circle-xmark" style="margin-right:6px;"></i>What didn't go well?</div>
       <textarea id="reflectBad" rows="4" placeholder="Be honest — what held you back?" style="width:100%;background:var(--dark3);border:1px solid #333;color:var(--text);padding:10px;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:0.8rem;resize:vertical;margin-top:8px;"></textarea>
     </div>
     <div class="task-card">
-      <div class="task-card-hdr" style="color:var(--gold)">🎯 Top 3 focus for next week</div>
+      <div class="task-card-hdr" style="color:var(--gold)"><i class="fa-solid fa-crosshairs" style="margin-right:6px;"></i>Top 3 focus for next week</div>
       <textarea id="reflectNext" rows="4" placeholder="1. &#10;2. &#10;3. " style="width:100%;background:var(--dark3);border:1px solid #333;color:var(--text);padding:10px;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:0.8rem;resize:vertical;margin-top:8px;"></textarea>
     </div>
     <div class="task-card">
-      <div class="task-card-hdr" style="color:var(--purple)">🤲 Gratitude — 3 things</div>
+      <div class="task-card-hdr" style="color:var(--purple)"><i class="fa-solid fa-hands-praying" style="margin-right:6px;"></i>Gratitude — 3 things</div>
       <textarea id="reflectGrat" rows="4" placeholder="What are you grateful for this week?" style="width:100%;background:var(--dark3);border:1px solid #333;color:var(--text);padding:10px;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:0.8rem;resize:vertical;margin-top:8px;"></textarea>
     </div>
   </div>
@@ -957,14 +995,14 @@ hr{ border-color: rgba(201,168,76,0.07); }
 
   <!-- History -->
   <div class="task-card">
-    <div class="task-card-hdr" style="color:var(--gold)">📊 All Weeks — Score History</div>
+    <div class="task-card-hdr" style="color:var(--gold)"><i class="fa-solid fa-chart-bar" style="margin-right:6px;"></i>All Weeks — Score History</div>
     <div id="reflectHistory" style="margin-top:10px;"></div>
   </div>
 </div>
 
 <!-- MONEY -->
 <div class="sec" id="sec-money">
-  <div class="sec-title">💰 Money Tracker</div>
+  <div class="sec-title"><span class="sec-icon"><i class="fa-solid fa-coins"></i></span> Money Tracker</div>
   <div class="sec-sub">Log daily expenses by category → auto-sums to weekly → monthly. Track savings separately.</div>
 
   <!-- Top summary cards -->
@@ -1090,7 +1128,7 @@ hr{ border-color: rgba(201,168,76,0.07); }
 
 <!-- WEEKLY -->
 <div class="sec" id="sec-weekly">
-  <div class="sec-title">Weekly View</div>
+  <div class="sec-title"><span class="sec-icon"><i class="fa-solid fa-calendar-week"></i></span> Weekly View</div>
   <div class="sec-sub">Daily completions cascade up to weekly progress automatically.</div>
   <div class="wk-nav">
     <button class="btn" onclick="changeWeek(-1)">← Prev</button>
@@ -1105,7 +1143,7 @@ hr{ border-color: rgba(201,168,76,0.07); }
 
 <!-- MONTHLY -->
 <div class="sec" id="sec-monthly">
-  <div class="sec-title">Monthly Goals</div>
+  <div class="sec-title"><span class="sec-icon"><i class="fa-solid fa-calendar"></i></span> Monthly Goals</div>
   <div class="sec-sub">Progress flows up from your daily checkboxes → weekly totals → monthly score.</div>
   <div class="mo-nav">
     <button class="btn" onclick="changeMo(-1)">← Prev</button>
@@ -1118,13 +1156,13 @@ hr{ border-color: rgba(201,168,76,0.07); }
 
 <!-- TRACKER -->
 <div class="sec" id="sec-tracker">
-  <div class="sec-title">2026 Goals Tracker</div>
+  <div class="sec-title"><span class="sec-icon"><i class="fa-solid fa-chart-line"></i></span> 2026 Goals Tracker</div>
   <div class="sec-sub">All major goals — bars update in real-time as you check daily tasks.</div>
   <div class="gt-list" id="gtList"></div>
 
   <!-- STREAK WALL -->
   <div style="margin-top:24px;">
-    <div class="sec-title" style="font-size:1rem;margin-bottom:4px;">🔥 Streak Wall — Don't Break the Chain</div>
+    <div class="sec-title" style="font-size:1rem;margin-bottom:4px;"><span class="sec-icon" style="width:28px;height:28px;border-radius:7px;font-size:0.75rem;"><i class="fa-solid fa-fire"></i></span> Streak Wall — Don't Break the Chain</div>
     <div class="sec-sub" style="margin-bottom:14px;">Every day you complete a habit = one gold square. Jun → Dec 2026.</div>
     <div id="streakWall"></div>
   </div>
@@ -1132,7 +1170,7 @@ hr{ border-color: rgba(201,168,76,0.07); }
 
 <!-- DIET -->
 <div class="sec" id="sec-diet">
-  <div class="sec-title">🥗 Diet Compliance</div>
+  <div class="sec-title"><span class="sec-icon"><i class="fa-solid fa-leaf"></i></span> Diet Compliance</div>
   <div class="sec-sub">No bread · No sugar — check daily, track weekly & monthly streaks.</div>
 
   <div class="day-nav">
@@ -1211,7 +1249,7 @@ hr{ border-color: rgba(201,168,76,0.07); }
 
 <!-- VISION -->
 <div class="sec" id="sec-vision">
-  <div class="sec-title">10-Year Vision (2025–2035)</div>
+  <div class="sec-title"><span class="sec-icon"><i class="fa-solid fa-eye"></i></span> 10-Year Vision (2025–2035)</div>
   <div class="sec-sub">Your 7 life pillars — everything in 2026 feeds these.</div>
   <div class="vis-grid" id="visGrid"></div>
 </div>
@@ -2533,11 +2571,11 @@ let prayerDate  = new Date();
 let prayerMonth = 6;
 
 const PRAYERS = [
-  { id:'fajr',   name:'Fajr',    time:'~05:00', emoji:'🌅' },
-  { id:'dhuhr',  name:'Dhuhr',   time:'~13:00', emoji:'☀️' },
-  { id:'asr',    name:'Asr',     time:'~17:00', emoji:'🌤️' },
-  { id:'maghrib',name:'Maghrib', time:'~20:00', emoji:'🌇' },
-  { id:'isha',   name:'Isha',    time:'~22:00', emoji:'🌙' },
+  { id:'fajr',   name:'Fajr',    time:'~05:00', icon:'fa-solid fa-sun',      iconColor:'#C9A84C' },
+  { id:'dhuhr',  name:'Dhuhr',   time:'~13:00', icon:'fa-solid fa-circle',   iconColor:'#F0C040' },
+  { id:'asr',    name:'Asr',     time:'~17:00', icon:'fa-solid fa-cloud-sun',iconColor:'#E07A30' },
+  { id:'maghrib',name:'Maghrib', time:'~20:00', icon:'fa-solid fa-moon',     iconColor:'#B464C8' },
+  { id:'isha',   name:'Isha',    time:'~22:00', icon:'fa-solid fa-star',     iconColor:'#4A90D9' },
 ];
 
 function loadPrayerFromCloud(){
@@ -2607,7 +2645,7 @@ function renderPrayer(){
     const labels={none:'Tap to log',ontime:'✓ On Time',late:'⏰ Late',missed:'✗ Missed'};
     const bg=colors[status];
     return `<div onclick="cyclePrayer('${key}','${p.id}')" style="background:var(--dark2);border:2px solid ${bg};border-radius:10px;padding:16px;text-align:center;cursor:pointer;transition:all .2s;">
-      <div style="font-size:1.6rem;margin-bottom:6px;">${p.emoji}</div>
+      <div style="display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:12px;background:${p.iconColor}1A;border:1px solid ${p.iconColor}44;color:${p.iconColor};font-size:1rem;margin-bottom:6px;box-shadow:0 3px 10px rgba(0,0,0,0.4),0 0 12px ${p.iconColor}22;"><i class="${p.icon}"></i></div>
       <div style="font-size:0.85rem;font-weight:700;color:var(--text);margin-bottom:2px;">${p.name}</div>
       <div style="font-size:0.62rem;color:var(--muted);margin-bottom:8px;">${p.time}</div>
       <div style="font-size:0.72rem;font-weight:600;color:${bg==='#222'?'var(--muted)':bg};padding:4px 8px;border-radius:12px;background:${bg}22;">${labels[status]}</div>
@@ -2811,11 +2849,11 @@ let reflectState={}; // { 'YYYY-WW': { scores:{}, well, bad, next, grat } }
 let reflectWkOff=0;
 
 const REFLECT_AREAS=[
-  {id:'discipline', label:'Discipline',  emoji:'⚡', color:'#C9A84C'},
-  {id:'deen',       label:'Deen / Faith',emoji:'🕌', color:'#E07A30'},
-  {id:'health',     label:'Health / Gym',emoji:'💪', color:'#4CAF7D'},
-  {id:'business',   label:'Business',   emoji:'🛒', color:'#40C0D0'},
-  {id:'mindset',    label:'Mindset',    emoji:'🧠', color:'#B464C8'},
+  {id:'discipline', label:'Discipline',  icon:'fa-solid fa-bolt',      color:'#C9A84C'},
+  {id:'deen',       label:'Deen / Faith',icon:'fa-solid fa-mosque',    color:'#E07A30'},
+  {id:'health',     label:'Health / Gym',icon:'fa-solid fa-dumbbell',  color:'#4CAF7D'},
+  {id:'business',   label:'Business',    icon:'fa-solid fa-briefcase', color:'#40C0D0'},
+  {id:'mindset',    label:'Mindset',     icon:'fa-solid fa-brain',     color:'#B464C8'},
 ];
 
 function getWeekKey(offset){
@@ -2857,7 +2895,7 @@ function renderReflect(){
     const val=saved.scores[a.id]||5;
     return `<div>
       <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-        <div style="font-size:0.82rem;font-weight:600;">${a.emoji} ${a.label}</div>
+        <div style="display:flex;align-items:center;gap:7px;font-size:0.82rem;font-weight:600;"><span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:${a.color}18;border:1px solid ${a.color}44;color:${a.color};font-size:0.6rem;"><i class="${a.icon}"></i></span>${a.label}</div>
         <div style="font-size:0.9rem;font-weight:700;color:${a.color}" id="sliderVal-${a.id}">${val}/10</div>
       </div>
       <input type="range" id="slider-${a.id}" min="1" max="10" value="${val}"
@@ -2894,7 +2932,7 @@ function renderReflect(){
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         ${REFLECT_AREAS.map(a=>{
           const v=r.scores[a.id]||0;
-          return `<div style="font-size:0.68rem;padding:3px 8px;border-radius:10px;background:${a.color}22;color:${a.color};">${a.emoji} ${v}</div>`;
+          return `<div style="display:inline-flex;align-items:center;gap:4px;font-size:0.68rem;padding:3px 8px;border-radius:10px;background:${a.color}22;color:${a.color};"><i class="${a.icon}" style="font-size:0.55rem;"></i>${v}</div>`;
         }).join('')}
       </div>
       ${r.well?`<div style="font-size:0.72rem;color:var(--muted);margin-top:6px;border-top:1px solid #2a2520;padding-top:6px;">✅ ${r.well.substring(0,80)}${r.well.length>80?'...':''}</div>`:''}
@@ -2945,14 +2983,14 @@ function renderDashboard(){
   const overallPct = overallStats().pct;
 
   document.getElementById('dashPulse').innerHTML = [
-    {label:'Tasks Done',  val:`${taskDone}/${tasks.length}`, sub:`${taskPct}%`,      color:taskPct===100?'#4CAF7D':'#C9A84C', emoji:'✅'},
-    {label:'Prayers',     val:`${prayedToday}/5`,            sub:ontime+' on time',  color:prayedToday===5?'#C9A84C':'#D94A4A', emoji:'🕌'},
-    {label:'Diet Score',  val:`${dietScore}/4`,              sub:dietScore===4?'Perfect':'Keep going', color:dietScore===4?'#4CAF7D':dietScore>=2?'#E07A30':'#D94A4A', emoji:'🥗'},
-    {label:'Spent Today', val:todaySpent?fmtNum(todaySpent):'0',sub:"so'm",          color:'#4A90D9', emoji:'💰'},
-    {label:'2026 Overall',val:`${overallPct}%`,              sub:'all tasks',         color:'#C9A84C', emoji:'📈'},
+    {label:'Tasks Done',  val:`${taskDone}/${tasks.length}`, sub:`${taskPct}%`,      color:taskPct===100?'#4CAF7D':'#C9A84C', icon:'fa-solid fa-list-check'},
+    {label:'Prayers',     val:`${prayedToday}/5`,            sub:ontime+' on time',  color:prayedToday===5?'#C9A84C':'#D94A4A', icon:'fa-solid fa-mosque'},
+    {label:'Diet Score',  val:`${dietScore}/4`,              sub:dietScore===4?'Perfect':'Keep going', color:dietScore===4?'#4CAF7D':dietScore>=2?'#E07A30':'#D94A4A', icon:'fa-solid fa-leaf'},
+    {label:'Spent Today', val:todaySpent?fmtNum(todaySpent):'0',sub:"so'm",          color:'#4A90D9', icon:'fa-solid fa-coins'},
+    {label:'2026 Overall',val:`${overallPct}%`,              sub:'all tasks',         color:'#C9A84C', icon:'fa-solid fa-chart-line'},
   ].map(c=>`
     <div class="task-card" style="text-align:center;padding:14px;border-top:3px solid ${c.color};">
-      <div style="font-size:1.4rem;margin-bottom:4px;">${c.emoji}</div>
+      <div style="display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:11px;background:${c.color}1A;border:1px solid ${c.color}44;color:${c.color};font-size:0.95rem;margin-bottom:6px;box-shadow:0 2px 10px rgba(0,0,0,0.4),0 0 12px ${c.color}22;"><i class="${c.icon}"></i></div>
       <div style="font-family:'Playfair Display',serif;font-size:1.3rem;color:${c.color};font-weight:700;">${c.val}</div>
       <div style="font-size:0.62rem;color:var(--muted);margin-top:2px;">${c.label}</div>
       <div style="font-size:0.6rem;color:${c.color};margin-top:1px;">${c.sub}</div>
@@ -2976,32 +3014,32 @@ function renderDashboard(){
     const colors={none:'#333',ontime:'#C9A84C',late:'#4CAF7D',missed:'#D94A4A'};
     const labels={none:'—',ontime:'On Time',late:'Late',missed:'Missed'};
     return `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid #1a1a1a;">
-      <div style="font-size:0.82rem;">${p.emoji} ${p.name}</div>
+      <div style="display:flex;align-items:center;gap:7px;font-size:0.82rem;"><span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:${p.iconColor}18;border:1px solid ${p.iconColor}44;color:${p.iconColor};font-size:0.55rem;flex-shrink:0;"><i class="${p.icon}"></i></span>${p.name}</div>
       <div style="font-size:0.68rem;font-weight:600;color:${colors[s]};padding:2px 8px;border-radius:10px;background:${colors[s]}22;">${labels[s]}</div>
     </div>`;
   }).join('');
 
   // Streak cards
   const HABITS = [
-    {label:'Tasks',   emoji:'✅', color:'#C9A84C',  getStreak: ()=>{
+    {label:'Tasks',   icon:'fa-solid fa-list-check', color:'#C9A84C',  getStreak: ()=>{
       let s=0,d=new Date(today);
       while(true){ const k=dateKey(d); const ts=getTasksForDate(d); if(ts.length&&ts.every(t=>getTask(k,t.id)))s++; else break; d=addDays(d,-1); if(d<START)break; } return s;
     }},
-    {label:'Prayer',  emoji:'🕌', color:'#E07A30',  getStreak: ()=>getPrayerStreak()},
-    {label:'Diet',    emoji:'🥗', color:'#4CAF7D',  getStreak: ()=>getDietStreak()},
-    {label:'Gym',     emoji:'💪', color:'#4A90D9',  getStreak: ()=>{
+    {label:'Prayer',  icon:'fa-solid fa-mosque',      color:'#E07A30',  getStreak: ()=>getPrayerStreak()},
+    {label:'Diet',    icon:'fa-solid fa-leaf',         color:'#4CAF7D',  getStreak: ()=>getDietStreak()},
+    {label:'Gym',     icon:'fa-solid fa-dumbbell',     color:'#4A90D9',  getStreak: ()=>{
       let s=0,d=new Date(today);
       while(true){ const k=dateKey(d); const ts=getTasksForDate(d).filter(t=>t.cat==='gym'); if(ts.length&&ts.every(t=>getTask(k,t.id)))s++; else break; d=addDays(d,-1); if(d<START)break; } return s;
     }},
   ];
   document.getElementById('dashStreaks').innerHTML = HABITS.map(h=>{
     const streak = h.getStreak();
-    const fire   = streak>=30?'🔥🔥🔥':streak>=14?'🔥🔥':streak>=3?'🔥':'';
-    return `<div style="text-align:center;background:var(--dark3);border-radius:10px;padding:14px;border:1px solid ${streak>0?h.color+'44':'#222'};">
-      <div style="font-size:1.6rem;">${h.emoji}</div>
+    const fireHtml = streak>=30?'<i class="fa-solid fa-fire" style="color:#FF6B35"></i><i class="fa-solid fa-fire" style="color:#FF6B35"></i><i class="fa-solid fa-fire" style="color:#FF6B35"></i>':streak>=14?'<i class="fa-solid fa-fire" style="color:#FF6B35"></i><i class="fa-solid fa-fire" style="color:#FF6B35"></i>':streak>=3?'<i class="fa-solid fa-fire" style="color:#FF6B35"></i>':'';
+    return `<div style="text-align:center;background:linear-gradient(155deg,#13131A,#0E0E14);border-radius:10px;padding:14px;border:1px solid ${streak>0?h.color+'44':'#222'};box-shadow:0 4px 16px rgba(0,0,0,0.4);">
+      <div style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;background:${h.color}18;border:1px solid ${h.color}44;color:${h.color};font-size:0.9rem;margin-bottom:6px;box-shadow:0 2px 8px rgba(0,0,0,0.4),0 0 10px ${h.color}22;"><i class="${h.icon}"></i></div>
       <div style="font-family:'Playfair Display',serif;font-size:1.8rem;color:${streak>0?h.color:'var(--muted)'};font-weight:700;">${streak}</div>
       <div style="font-size:0.65rem;color:var(--muted);margin-top:2px;">${h.label} streak</div>
-      <div style="font-size:0.75rem;margin-top:3px;">${fire||'Start today!'}</div>
+      <div style="font-size:0.75rem;margin-top:3px;">${fireHtml||'<span style="font-size:0.65rem;color:var(--muted)">Start today!</span>'}</div>
     </div>`;
   }).join('');
 
@@ -3053,23 +3091,23 @@ function renderDashboard(){
 // STREAK WALL
 // ═══════════════════════════════════════════
 const STREAK_HABITS = [
-  { label:'All Tasks',  emoji:'✅', color:'#C9A84C', check:(key)=>{
+  { label:'All Tasks',  icon:'fa-solid fa-list-check', color:'#C9A84C', check:(key)=>{
     const d=new Date(key); const ts=getTasksForDate(d);
     return ts.length>0 && ts.every(t=>getTask(key,t.id));
   }},
-  { label:'Prayer (all 5)', emoji:'🕌', color:'#E07A30', check:(key)=>{
+  { label:'Prayer (all 5)', icon:'fa-solid fa-mosque', color:'#E07A30', check:(key)=>{
     const {ontime,late}=prayerDayScore(key); return ontime+late===5;
   }},
-  { label:'Diet (4/4)',  emoji:'🥗', color:'#4CAF7D', check:(key)=> dietDayScore(key)===4 },
-  { label:'Gym',        emoji:'💪', color:'#4A90D9', check:(key)=>{
+  { label:'Diet (4/4)',  icon:'fa-solid fa-leaf',     color:'#4CAF7D', check:(key)=> dietDayScore(key)===4 },
+  { label:'Gym',        icon:'fa-solid fa-dumbbell',  color:'#4A90D9', check:(key)=>{
     const d=new Date(key); const ts=getTasksForDate(d).filter(t=>t.cat==='gym');
     return ts.length>0 && ts.every(t=>getTask(key,t.id));
   }},
-  { label:'Quran',      emoji:'📖', color:'#B464C8', check:(key)=>{
+  { label:'Quran',      icon:'fa-solid fa-book-open', color:'#B464C8', check:(key)=>{
     const d=new Date(key); const ts=getTasksForDate(d).filter(t=>t.cat==='quran');
     return ts.length>0 && ts.every(t=>getTask(key,t.id));
   }},
-  { label:'Finance',    emoji:'📈', color:'#FF8040', check:(key)=>{
+  { label:'Finance',    icon:'fa-solid fa-chart-line', color:'#FF8040', check:(key)=>{
     const d=new Date(key); const ts=getTasksForDate(d).filter(t=>t.cat==='finance');
     return ts.length>0 && ts.every(t=>getTask(key,t.id));
   }},
@@ -3094,9 +3132,9 @@ function renderStreakWall(){
 
     html+=`<div style="margin-bottom:16px;">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
-        <span style="font-size:1rem;">${h.emoji}</span>
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:6px;background:${h.color}18;border:1px solid ${h.color}44;color:${h.color};font-size:0.6rem;"><i class="${h.icon}"></i></span>
         <span style="font-size:0.82rem;font-weight:600;color:${h.color};">${h.label}</span>
-        <span style="font-size:0.7rem;color:var(--muted);margin-left:4px;">🔥 ${streak} day streak</span>
+        <span style="font-size:0.7rem;color:var(--muted);margin-left:4px;"><i class="fa-solid fa-fire" style="color:#FF6B35;font-size:0.65rem;"></i> ${streak} day streak</span>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:3px;">`;
 
@@ -3209,12 +3247,12 @@ function renderYoutube(){
 
   // Stats
   document.getElementById('ytStats').innerHTML=[
-    {label:'Episodes Uploaded', val:uploaded,    sub:'of 24 total',              color:'#FF6080', emoji:'🚀'},
-    {label:'Filmed (not yet up)',val:filmed,      sub:'ready to upload',          color:'#C9A84C', emoji:'🎥'},
-    {label:'Current Episode',   val:'#'+curEp.ep,sub:curEp.startMod+'–'+curEp.endMod+' moddalar', color:'#4A90D9', emoji:'📺'},
-    {label:'Episodes Left',     val:remaining,   sub:'to complete the series',   color:'#4CAF7D', emoji:'📋'},
+    {label:'Episodes Uploaded', val:uploaded,    sub:'of 24 total',              color:'#FF6080', icon:'fa-solid fa-upload'},
+    {label:'Filmed (not yet up)',val:filmed,      sub:'ready to upload',          color:'#C9A84C', icon:'fa-solid fa-video'},
+    {label:'Current Episode',   val:'#'+curEp.ep,sub:curEp.startMod+'–'+curEp.endMod+' moddalar', color:'#4A90D9', icon:'fa-solid fa-play'},
+    {label:'Episodes Left',     val:remaining,   sub:'to complete the series',   color:'#4CAF7D', icon:'fa-solid fa-film'},
   ].map(c=>`<div class="task-card" style="text-align:center;padding:14px;border-top:3px solid ${c.color};">
-    <div style="font-size:1.3rem;margin-bottom:4px;">${c.emoji}</div>
+    <div style="display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:11px;background:${c.color}1A;border:1px solid ${c.color}44;color:${c.color};font-size:0.95rem;margin-bottom:6px;box-shadow:0 2px 10px rgba(0,0,0,0.4),0 0 12px ${c.color}22;"><i class="${c.icon}"></i></div>
     <div style="font-family:'Playfair Display',serif;font-size:1.4rem;color:${c.color};font-weight:700;">${c.val}</div>
     <div style="font-size:0.62rem;color:var(--muted);margin-top:2px;">${c.label}</div>
     <div style="font-size:0.6rem;color:${c.color};margin-top:1px;">${c.sub}</div>
