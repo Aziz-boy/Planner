@@ -629,7 +629,7 @@ bot.on('callback_query', (query) => {
 // ── Express server ────────────────────────────────────────────────────────────
 const app = express();
 app.use(express.json());
-app.use(cors({ origin: process.env.PLANNER_URL || '*' }));
+app.use(cors({ origin: '*' }));
 
 app.get('/', (req, res) => res.json({ status: 'ok', bot: 'Life Planner Bot AI Edition' }));
 app.get('/vapid-public-key', (req, res) => res.json({ key: process.env.VAPID_PUBLIC_KEY || null }));
