@@ -87,7 +87,7 @@ function safeJSON(str) {
 const SUBS_FILE = path.join(__dirname, 'subscriptions.json');
 if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
   webpush.setVapidDetails(
-    process.env.VAPID_EMAIL || 'mailto:admin@example.com',
+    process.env.VAPID_EMAIL || 'mailto:shavgoniaziz@gmail.com',
     process.env.VAPID_PUBLIC_KEY,
     process.env.VAPID_PRIVATE_KEY
   );

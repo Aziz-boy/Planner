@@ -577,7 +577,6 @@ hr{ border-color: rgba(201,168,76,0.07); }
   /* push all sections above the bottom nav */
   .sec{padding-bottom:70px;}
   #ai-fab{bottom:68px;}
-  #notifBtn{bottom:68px;}
 }
 
 @media(max-width:480px){
@@ -907,6 +906,12 @@ hr{ border-color: rgba(201,168,76,0.07); }
     <div id="prayerWeekHeat" style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-top:10px;"></div>
   </div>
 
+  <!-- Quran Surah Schedule -->
+  <div class="task-card" style="margin-bottom:16px;">
+    <div class="task-card-hdr" style="color:var(--gold)">📖 Summer Quran Schedule — 1 Surah/Week</div>
+    <div id="surahSchedule" style="margin-top:8px;"></div>
+  </div>
+
   <!-- Monthly calendar -->
   <div class="task-card">
     <div class="task-card-hdr" style="color:var(--gold)">Monthly Prayer Calendar</div>
@@ -1218,7 +1223,7 @@ hr{ border-color: rgba(201,168,76,0.07); }
     <div class="sec-title" style="font-size:1rem;margin-bottom:4px;"><span class="sec-icon" style="width:28px;height:28px;border-radius:7px;font-size:0.75rem;">⚖️</span> Body Weight Journey</div>
     <div class="sec-sub" style="margin-bottom:14px;">Log weekly. Target: 105kg → 85kg by Dec 2026.</div>
     <div class="task-card" style="margin-bottom:14px;">
-      <div class="task-card-hdr" style="color:#4CAF7D">Log Today's Weight</div>
+      <div class="task-card-hdr" style="color:#4CAF7D">Log Today's Weight — Target: 90kg by September</div>
       <div style="display:flex;gap:10px;align-items:center;margin-top:8px;">
         <input id="weightInput" type="number" step="0.1" min="50" max="200" placeholder="e.g. 103.5"
           style="width:120px;background:var(--dark3);border:1px solid #333;color:var(--text);padding:8px 12px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.9rem;">
@@ -1596,25 +1601,34 @@ function getTasksForDate(date) {
   const vid = getFinanceVideoForDate(date);
   const fiText = `📺 Watch: ${vid.title}`;
 
-  if (t === 'monday') return [
-    {id:'q', cat:'quran',    text:'Quran reading & memorization',        time:'09:00', pts:3},
-    {id:'g1',cat:'gym',      text:'Gym — Cardio (1 hr)',                  time:'09:30', pts:3},
-    {id:'ru',cat:'russian',  text:'Russian class / self-study (1.5hr)',  time:'10:30', pts:3},
-    {id:'fi',cat:'finance',  text:fiText,                                 time:'12:30', pts:3, url:vid.url},
-    {id:'g2',cat:'gym',      text:'Gym — Weight training (1.5hr)',        time:'16:30', pts:3},
-    {id:'bs',cat:'business', text:'Business study: Uzum / China',         time:'18:30', pts:3},
-    {id:'pl',cat:'plan',     text:'Plan tomorrow\'s top 3 tasks',         time:'20:00', pts:2},
-  ];
-  if (t === 'saturday') return [
+  const isSummer = date < new Date('2026-09-01');
+
+  // ── SATURDAY (filming day year-round) ─────────────────────────────────────
+  if (t === 'saturday') return isSummer ? [
+    {id:'q', cat:'quran',    text:'Quran — memorize this week\'s surah',  time:'09:00', pts:3},
+    {id:'g', cat:'gym',      text:'Gym — Full session (cardio+weights)',  time:'10:00', pts:3},
+    {id:'yt',cat:'content',  text:'🎬 Film YouTube FK video (episode)',   time:'12:00', pts:4},
+    {id:'ed',cat:'content',  text:'Edit & upload YouTube FK video',       time:'14:00', pts:4},
+    {id:'br',cat:'finance',  text:'Brokerage / tender / auction study',   time:'17:00', pts:3},
+    {id:'pl',cat:'plan',     text:'Plan next week goals',                 time:'19:00', pts:2},
+  ] : [
     {id:'q', cat:'quran',    text:'Quran 45 min + memorization review',   time:'09:00', pts:3},
     {id:'g', cat:'gym',      text:'Gym — Full session (cardio+weights)',  time:'10:00', pts:3},
     {id:'yt',cat:'content',  text:'Film YouTube video (law topic)',        time:'12:00', pts:4},
     {id:'ed',cat:'content',  text:'Edit & post YouTube video',             time:'14:00', pts:4},
-    {id:'ig',cat:'content',  text:'Create & post Instagram content',      time:'16:00', pts:3},
     {id:'fi',cat:'finance',  text:fiText,                                  time:'17:00', pts:3, url:vid.url},
     {id:'bs',cat:'business', text:'Business planning: Uzum / China',      time:'19:00', pts:3},
   ];
-  if (t === 'sunday') return [
+
+  // ── SUNDAY ────────────────────────────────────────────────────────────────
+  if (t === 'sunday') return isSummer ? [
+    {id:'q', cat:'quran',    text:'Quran 45 min + review week\'s surah',  time:'09:00', pts:3},
+    {id:'g', cat:'gym',      text:'Gym — Full session',                    time:'10:00', pts:3},
+    {id:'br',cat:'finance',  text:'Brokerage/tender/auction deep study',  time:'12:00', pts:3},
+    {id:'sc',cat:'finance',  text:'Saving review — check car fund goal',  time:'15:00', pts:2},
+    {id:'wr',cat:'plan',     text:'Weekly review — what did I complete?', time:'18:00', pts:3},
+    {id:'pw',cat:'plan',     text:'Plan next week — write top goals',     time:'19:00', pts:3},
+  ] : [
     {id:'q', cat:'quran',    text:'Quran 45 min + new surah work',        time:'09:00', pts:3},
     {id:'g', cat:'gym',      text:'Gym — Full session',                    time:'10:00', pts:3},
     {id:'uz',cat:'business', text:'Uzum marketplace: research / list',    time:'12:00', pts:3},
@@ -1623,6 +1637,8 @@ function getTasksForDate(date) {
     {id:'wr',cat:'plan',     text:'Weekly review — what did I complete?', time:'18:00', pts:3},
     {id:'pw',cat:'plan',     text:'Plan next week — write top goals',     time:'19:00', pts:3},
   ];
+
+  // ── SCHOOL SEASON weekdays (Sept+) ────────────────────────────────────────
   if (t === 'school') return [
     {id:'wk',cat:'work',     text:'Work — Logistics shift (01–09)',        time:'01:00', pts:1},
     {id:'q', cat:'quran',    text:'Quran + prayer (20 min)',               time:'09:00', pts:3},
@@ -1633,16 +1649,29 @@ function getTasksForDate(date) {
     {id:'g2',cat:'gym',      text:'Gym — Weight training (1.5hr)',         time:'19:30', pts:3},
     {id:'pl',cat:'plan',     text:'Plan tomorrow\'s top 3 tasks',          time:'21:30', pts:2},
   ];
-  // summer weekday
-  return [
+
+  // ── SCHOOL SEASON Monday (Sept+) ──────────────────────────────────────────
+  if (t === 'monday') return [
     {id:'wk',cat:'work',     text:'Work — Logistics shift (01–09)',        time:'01:00', pts:1},
     {id:'q', cat:'quran',    text:'Quran + prayer (20 min)',               time:'09:00', pts:3},
     {id:'g1',cat:'gym',      text:'Gym — Cardio (1 hr)',                   time:'09:30', pts:3},
-    {id:'ru',cat:'russian',  text:'Russian class / study (1.5hr)',         time:'10:30', pts:3},
-    {id:'fi',cat:'finance',  text:fiText,                                  time:'12:30', pts:3, url:vid.url},
+    {id:'ru',cat:'russian',  text:'Russian class / self-study (1.5hr)',   time:'10:30', pts:3},
+    {id:'sc',cat:'study',    text:'Law school (13:00–18:30)',              time:'13:00', pts:1},
+    {id:'fi',cat:'finance',  text:fiText,                                  time:'18:30', pts:3, url:vid.url},
+    {id:'g2',cat:'gym',      text:'Gym — Weight training (1.5hr)',         time:'19:30', pts:3},
+    {id:'bs',cat:'business', text:'Business study: Uzum / China',          time:'21:00', pts:3},
+    {id:'pl',cat:'plan',     text:'Plan tomorrow\'s top 3 tasks',          time:'22:00', pts:2},
+  ];
+
+  // ── SUMMER weekday (May 30 – Aug 31) — 4 GOALS ONLY ─────────────────────
+  return [
+    {id:'wk',cat:'work',     text:'Work — Logistics shift (01–09)',        time:'01:00', pts:1},
+    {id:'q', cat:'quran',    text:'Quran + this week\'s surah (20 min)',   time:'09:00', pts:3},
+    {id:'g1',cat:'gym',      text:'Gym — Cardio (1 hr fat loss)',          time:'09:30', pts:3},
+    {id:'br',cat:'finance',  text:'Brokerage / tender / auction study',    time:'11:00', pts:3},
     {id:'g2',cat:'gym',      text:'Gym — Weight training (1.5hr)',         time:'16:30', pts:3},
-    {id:'bs',cat:'business', text:'Business / Law self-study (1hr)',       time:'18:30', pts:3},
-    {id:'pl',cat:'plan',     text:'Plan tomorrow\'s top 3 tasks',          time:'20:00', pts:2},
+    {id:'sv',cat:'plan',     text:'Car fund: check savings progress',      time:'20:00', pts:2},
+    {id:'pl',cat:'plan',     text:'Plan tomorrow\'s top 3 tasks',          time:'20:30', pts:2},
   ];
 }
 
@@ -2702,6 +2731,7 @@ function getPrayerStreak(){
 }
 
 function renderPrayer(){
+  renderSurahSchedule();
   const key=dateKey(prayerDate);
   const isToday=key===dateKey(new Date());
   document.getElementById('prayerDowDisp').textContent=DAYS_FULL[prayerDate.getDay()];
@@ -3455,7 +3485,7 @@ function renderWeightChart() {
     return;
   }
 
-  const TARGET = 85, START_W = 105;
+  const TARGET = 90, START_W = 105;
   const allWeights = entries.map(e => e[1]);
   const minW = Math.min(...allWeights, TARGET) - 2;
   const maxW = Math.max(...allWeights, START_W) + 2;
@@ -3790,15 +3820,74 @@ window._loadFromFirebase = async function() {
 };
 
 
+// ═══════════════════════════════════════════
+// QURAN SURAH SCHEDULE
+// ═══════════════════════════════════════════
+const SURAH_SCHEDULE = [
+  { week:'2026-06-01', surah:'An-Nas (114)',      ayahs:6  },
+  { week:'2026-06-08', surah:'Al-Falaq (113)',    ayahs:5  },
+  { week:'2026-06-15', surah:'Al-Ikhlas (112)',   ayahs:4  },
+  { week:'2026-06-22', surah:'Al-Masad (111)',    ayahs:5  },
+  { week:'2026-06-29', surah:'An-Nasr (110)',     ayahs:3  },
+  { week:'2026-07-06', surah:'Al-Kafirun (109)',  ayahs:6  },
+  { week:'2026-07-13', surah:'Al-Kawthar (108)',  ayahs:3  },
+  { week:'2026-07-20', surah:"Al-Ma'un (107)",    ayahs:7  },
+  { week:'2026-07-27', surah:'Quraysh (106)',     ayahs:4  },
+  { week:'2026-08-03', surah:'Al-Fil (105)',      ayahs:5  },
+  { week:'2026-08-10', surah:'Al-Humazah (104)',  ayahs:9  },
+  { week:'2026-08-17', surah:"Al-'Asr (103)",     ayahs:3  },
+  { week:'2026-08-24', surah:'At-Takathur (102)', ayahs:8  },
+  { week:'2026-08-31', surah:"Al-Qari'ah (101)",  ayahs:11 },
+];
+
+function renderSurahSchedule() {
+  const el = document.getElementById('surahSchedule');
+  if (!el) return;
+  const today = new Date(Date.now());
+  const todayKey = dateKey(today);
+
+  // Find current week's surah
+  let currentIdx = -1;
+  for (let i = SURAH_SCHEDULE.length - 1; i >= 0; i--) {
+    if (todayKey >= SURAH_SCHEDULE[i].week) { currentIdx = i; break; }
+  }
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:auto 1fr auto;gap:6px 12px;align-items:center;font-size:0.75rem;">
+      ${SURAH_SCHEDULE.map((s, i) => {
+        const isPast    = todayKey > s.week && i !== currentIdx;
+        const isCurrent = i === currentIdx;
+        const isFuture  = todayKey < s.week;
+        const icon = isPast ? '✅' : isCurrent ? '📖' : '⬜';
+        const dateLabel = s.week.slice(5).replace('-', '/');
+        return `
+          <div style="color:${isCurrent?'#C9A84C':isPast?'#4CAF7D':'#444'};font-weight:${isCurrent?700:400};">${icon}</div>
+          <div style="color:${isCurrent?'#EDE8E0':isPast?'#706A60':'#555'};font-weight:${isCurrent?600:400};
+            ${isCurrent?'background:rgba(201,168,76,0.08);padding:3px 8px;border-radius:6px;margin:-3px 0;':''}">
+            ${s.surah}${isCurrent?' <span style="color:#C9A84C;font-size:0.65rem;">← THIS WEEK</span>':''}
+          </div>
+          <div style="color:${isCurrent?'#C9A84C':isPast?'#555':'#3a3a3a'};font-size:0.65rem;white-space:nowrap;">${dateLabel} · ${s.ayahs}v</div>`;
+      }).join('')}
+    </div>
+    ${currentIdx >= 0 ? `<div style="margin-top:12px;padding:10px 12px;background:rgba(201,168,76,0.07);border:1px solid rgba(201,168,76,0.2);border-radius:10px;font-size:0.78rem;color:#C9A84C;">
+      📖 This week: <b>${SURAH_SCHEDULE[currentIdx].surah}</b> — ${SURAH_SCHEDULE[currentIdx].ayahs} ayahs
+      &nbsp;·&nbsp; Week ${currentIdx+1} of ${SURAH_SCHEDULE.length}
+    </div>` : ''}`;
+}
+
 function init(){
-  // Data loaded by Firebase module via window._onFirebaseLoaded
   loadDietFromCloud();
   loadMoneyFromCloud();
   loadPrayerFromCloud();
   loadWorkoutFromCloud();
   loadReflectFromCloud();
   loadYtFromCloud();
-  // rendering triggered by _onFirebaseLoaded
+  // Auto-save every 30 seconds if there are unsaved changes
+  setInterval(() => {
+    if (unsavedChanges && typeof saveAllData === 'function') {
+      saveAllData();
+    }
+  }, 30000);
 }
 init();
 window.addEventListener('beforeunload', function(e){
@@ -3806,90 +3895,6 @@ window.addEventListener('beforeunload', function(e){
 });
 </script>
 
-<!-- ── Browser Push Notifications (Life Planner Bot) ─────────────────── -->
-<script>
-(function(){
-  // Change this to your deployed bot server URL (Railway / Render)
-  const BOT_SERVER = 'https://life-planner-bot-1r4w.onrender.com';
-
-  const btn = document.createElement('button');
-  btn.id = 'notifBtn';
-  btn.style.cssText = [
-    'position:fixed;bottom:20px;right:20px;z-index:9999',
-    'background:linear-gradient(135deg,rgba(201,168,76,0.22),rgba(201,168,76,0.08))',
-    'border:1px solid rgba(201,168,76,0.45);color:#C9A84C',
-    'padding:9px 16px;border-radius:10px;cursor:pointer',
-    'font-family:"DM Sans",sans-serif;font-size:0.75rem;font-weight:600',
-    'box-shadow:0 4px 20px rgba(0,0,0,0.5),0 0 16px rgba(201,168,76,0.08)',
-    'transition:all .2s;backdrop-filter:blur(8px)'
-  ].join(';');
-  btn.textContent = '🔔 Enable Reminders';
-
-  function updateBtn(state) {
-    if (state === 'granted')  { btn.textContent = '✅ Reminders ON';  btn.style.borderColor = 'rgba(76,175,125,0.5)'; btn.style.color = '#4CAF7D'; }
-    if (state === 'denied')   { btn.textContent = '🔕 Blocked';        btn.style.opacity = '0.5'; btn.style.cursor = 'default'; }
-    if (state === 'default')  { btn.textContent = '🔔 Enable Reminders'; }
-  }
-
-  async function subscribe() {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      alert('Your browser does not support push notifications.');
-      return;
-    }
-    try {
-      const perm = await Notification.requestPermission();
-      updateBtn(perm);
-      if (perm !== 'granted') return;
-
-      // Get VAPID public key from bot server
-      const keyRes = await fetch(BOT_SERVER + '/vapid-public-key').then(r => r.json());
-      if (!keyRes.key) { console.warn('No VAPID key — push disabled'); return; }
-
-      const reg = await navigator.serviceWorker.ready;
-      const existing = await reg.pushManager.getSubscription();
-      if (existing) { await existing.unsubscribe(); }
-
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(keyRes.key)
-      });
-
-      await fetch(BOT_SERVER + '/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sub)
-      });
-      console.log('Push subscription saved to bot server.');
-    } catch(e) {
-      console.error('Push setup failed:', e);
-    }
-  }
-
-  btn.addEventListener('click', subscribe);
-  document.body.appendChild(btn);
-
-  // Register service worker
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(e => console.warn('SW:', e));
-    navigator.serviceWorker.ready.then(async () => {
-      const perm = Notification.permission;
-      updateBtn(perm);
-      if (perm === 'granted') {
-        const reg = await navigator.serviceWorker.ready;
-        const sub = await reg.pushManager.getSubscription();
-        if (!sub) updateBtn('default'); // lost subscription, show button again
-      }
-    });
-  }
-
-  function urlBase64ToUint8Array(base64String) {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-    const rawData = atob(base64);
-    return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
-  }
-})();
-</script>
 
 <!-- ── AI Coach Chat Widget ───────────────────────────────────────────────── -->
 <style>
