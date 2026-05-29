@@ -3438,5 +3438,167 @@ window.addEventListener('beforeunload', function(e){
   }
 })();
 </script>
+
+<!-- ── AI Coach Chat Widget ───────────────────────────────────────────────── -->
+<style>
+#ai-fab{
+  position:fixed;bottom:72px;right:20px;z-index:9999;
+  width:48px;height:48px;border-radius:50%;border:none;cursor:pointer;
+  background:linear-gradient(135deg,#C9A84C,#8B6914);
+  box-shadow:0 4px 20px rgba(201,168,76,0.45);
+  font-size:1.3rem;display:flex;align-items:center;justify-content:center;
+  transition:transform .2s,box-shadow .2s;
+}
+#ai-fab:hover{transform:scale(1.1);box-shadow:0 6px 28px rgba(201,168,76,0.6);}
+#ai-panel{
+  position:fixed;bottom:130px;right:20px;z-index:9998;
+  width:340px;max-width:calc(100vw - 32px);
+  background:linear-gradient(155deg,#13131A,#0E0E14);
+  border:1px solid rgba(201,168,76,0.25);border-radius:16px;
+  box-shadow:0 12px 48px rgba(0,0,0,0.7),0 0 32px rgba(201,168,76,0.06);
+  display:none;flex-direction:column;overflow:hidden;
+  max-height:70vh;
+}
+#ai-panel.open{display:flex;}
+#ai-panel-hdr{
+  padding:12px 16px;
+  background:linear-gradient(90deg,rgba(201,168,76,0.12),rgba(201,168,76,0.04));
+  border-bottom:1px solid rgba(201,168,76,0.12);
+  display:flex;align-items:center;gap:10px;
+}
+#ai-panel-hdr .ai-title{font-size:0.82rem;font-weight:700;color:#C9A84C;flex:1;}
+.ai-mode-btns{display:flex;gap:6px;padding:10px 12px;border-bottom:1px solid rgba(201,168,76,0.08);}
+.ai-mode-btn{
+  flex:1;padding:6px 4px;border-radius:7px;border:1px solid rgba(201,168,76,0.15);
+  background:rgba(255,255,255,0.02);color:#706A60;font-size:0.65rem;font-weight:600;
+  cursor:pointer;transition:all .2s;font-family:'DM Sans',sans-serif;text-align:center;
+}
+.ai-mode-btn.active{background:rgba(201,168,76,0.15);border-color:rgba(201,168,76,0.4);color:#C9A84C;}
+#ai-messages{
+  flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;
+  min-height:120px;
+}
+.ai-msg{padding:8px 11px;border-radius:10px;font-size:0.78rem;line-height:1.45;max-width:90%;}
+.ai-msg.user{
+  background:rgba(201,168,76,0.12);border:1px solid rgba(201,168,76,0.18);
+  align-self:flex-end;color:#EDE8E0;border-radius:10px 10px 2px 10px;
+}
+.ai-msg.bot{
+  background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);
+  align-self:flex-start;color:#C8C2B8;border-radius:10px 10px 10px 2px;
+}
+.ai-msg.typing{color:#706A60;font-style:italic;}
+#ai-input-row{
+  display:flex;gap:8px;padding:10px 12px;
+  border-top:1px solid rgba(201,168,76,0.08);
+}
+#ai-input{
+  flex:1;background:rgba(255,255,255,0.04);border:1px solid rgba(201,168,76,0.15);
+  border-radius:8px;padding:7px 10px;color:#EDE8E0;font-family:'DM Sans',sans-serif;
+  font-size:0.78rem;outline:none;resize:none;
+}
+#ai-input:focus{border-color:rgba(201,168,76,0.4);}
+#ai-send{
+  background:linear-gradient(135deg,rgba(201,168,76,0.25),rgba(201,168,76,0.08));
+  border:1px solid rgba(201,168,76,0.35);color:#C9A84C;
+  padding:7px 12px;border-radius:8px;cursor:pointer;font-size:0.8rem;
+  transition:all .2s;white-space:nowrap;font-family:'DM Sans',sans-serif;
+}
+#ai-send:hover{background:rgba(201,168,76,0.25);}
+#ai-send:disabled{opacity:0.4;cursor:default;}
+@media(max-width:480px){
+  #ai-panel{width:calc(100vw - 32px);right:16px;bottom:120px;}
+  #ai-fab{bottom:68px;right:16px;}
+}
+</style>
+
+<button id="ai-fab" title="AI Coach">🧠</button>
+
+<div id="ai-panel">
+  <div id="ai-panel-hdr">
+    <span style="font-size:1rem;">🧠</span>
+    <span class="ai-title">AI Life Coach</span>
+    <button onclick="document.getElementById('ai-panel').classList.remove('open')"
+      style="background:none;border:none;color:#706A60;cursor:pointer;font-size:1rem;padding:0;">✕</button>
+  </div>
+  <div class="ai-mode-btns">
+    <button class="ai-mode-btn active" data-mode="coach"   onclick="setAiMode('coach')">🧠 Coach</button>
+    <button class="ai-mode-btn"        data-mode="russian" onclick="setAiMode('russian')">🇷🇺 Russian</button>
+    <button class="ai-mode-btn"        data-mode="finance" onclick="setAiMode('finance')">💰 Finance</button>
+  </div>
+  <div id="ai-messages">
+    <div class="ai-msg bot">👋 Salom! I'm your AI Coach. Ask me anything about your goals, progress, or plan — or switch to Russian practice mode!</div>
+  </div>
+  <div id="ai-input-row">
+    <textarea id="ai-input" rows="1" placeholder="Type a message..."></textarea>
+    <button id="ai-send" onclick="aiSend()">Send ↑</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  const BOT_SERVER_AI = 'https://your-bot-server.onrender.com'; // same as above
+
+  document.getElementById('ai-fab').addEventListener('click', () => {
+    document.getElementById('ai-panel').classList.toggle('open');
+  });
+
+  let aiMode    = 'coach';
+  let aiHistory = [];
+
+  window.setAiMode = function(mode) {
+    aiMode    = mode;
+    aiHistory = [];
+    document.querySelectorAll('.ai-mode-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.mode === mode);
+    });
+    const labels = { coach:'🧠 Coach mode — ask about your goals, progress, or today\'s plan.', russian:'🇷🇺 Russian practice — I\'ll respond in Russian, correct your mistakes, and teach logistics vocab!', finance:'💰 Finance mode — ask about spending, savings, or your car goal.' };
+    addAiMsg('bot', labels[mode] || '');
+  };
+
+  window.aiSend = async function() {
+    const inp  = document.getElementById('ai-input');
+    const send = document.getElementById('ai-send');
+    const text = inp.value.trim();
+    if (!text) return;
+    inp.value = '';
+    addAiMsg('user', text);
+    send.disabled = true;
+    const typing = addAiMsg('bot', '...', 'typing');
+    try {
+      const resp = await fetch(BOT_SERVER_AI + '/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, mode: aiMode, history: aiHistory })
+      });
+      const data = await resp.json();
+      typing.remove();
+      const reply = data.reply || data.error || 'Something went wrong.';
+      addAiMsg('bot', reply);
+      aiHistory.push({ role:'user', content:text }, { role:'assistant', content:reply });
+      if (aiHistory.length > 20) aiHistory = aiHistory.slice(-20);
+    } catch(e) {
+      typing.remove();
+      addAiMsg('bot', '❌ Could not reach bot server. Make sure it\'s deployed on Render.');
+    }
+    send.disabled = false;
+  };
+
+  function addAiMsg(role, text, extraClass = '') {
+    const box  = document.getElementById('ai-messages');
+    const el   = document.createElement('div');
+    el.className = `ai-msg ${role}${extraClass ? ' ' + extraClass : ''}`;
+    el.textContent = text;
+    box.appendChild(el);
+    box.scrollTop  = box.scrollHeight;
+    return el;
+  }
+
+  // Send on Enter (Shift+Enter for newline)
+  document.getElementById('ai-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); aiSend(); }
+  });
+})();
+</script>
 </body>
 </html>
