@@ -955,6 +955,137 @@ app.post('/chat', async (req, res) => {
   }
 });
 
+// ── AI Plan Generator ─────────────────────────────────────────────────────────
+app.post('/generate-plan', async (req, res) => {
+  const { goals, situation, vision, startDate, currentQuarterOnly } = req.body;
+  if (!process.env.OPENAI_API_KEY) return res.status(500).json({ error: 'OpenAI not configured' });
+  try {
+    const resp = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      response_format: { type: 'json_object' },
+      messages: [{
+        role: 'system',
+        content: `You are a life planning AI. Generate a complete, deeply personalized 2026 life plan as JSON.
+
+OUTPUT THIS EXACT JSON SCHEMA (no extra fields):
+{
+  "generatedAt": "YYYY-MM-DD",
+  "vision": {
+    "tenYear": "1 powerful sentence describing the 2035 life",
+    "oneYear": "1 sentence: what 2026 achievement means",
+    "values": ["4-5 core values as short strings"],
+    "milestones": { "2027": "string", "2028": "string", "2030": "string", "2035": "string" }
+  },
+  "quarters": [
+    {
+      "id": "summer",
+      "name": "Summer 2026",
+      "period": "Jun–Aug 2026",
+      "theme": "short motivating theme",
+      "goals": ["3-5 quarter goals as strings"],
+      "months": [
+        {
+          "month": 6,
+          "name": "June",
+          "focus": "1 sentence monthly focus",
+          "goals": ["3-4 monthly goals"],
+          "weeks": [
+            {
+              "startDate": "YYYY-MM-DD",
+              "num": 1,
+              "theme": "short week theme",
+              "quranSurah": "Surah name or null",
+              "weekFocus": "1 sentence focus for this week",
+              "tasks": {
+                "weekday": [
+                  {"id":"wk","cat":"work","text":"Work — Logistics shift (01–09)","time":"01:00","pts":1},
+                  {"id":"q","cat":"quran","text":"personalized quran task","time":"09:00","pts":3},
+                  {"id":"g1","cat":"gym","text":"personalized gym task","time":"09:30","pts":3},
+                  {"id":"br","cat":"finance","text":"specific brokerage/tender study task","time":"11:00","pts":3},
+                  {"id":"g2","cat":"gym","text":"Gym — Weight training (1.5hr)","time":"16:30","pts":3},
+                  {"id":"pl","cat":"plan","text":"specific evening task","time":"20:00","pts":2}
+                ],
+                "saturday": [
+                  {"id":"q","cat":"quran","text":"personalized","time":"09:00","pts":3},
+                  {"id":"g","cat":"gym","text":"Gym — Full session","time":"10:00","pts":3},
+                  {"id":"yt","cat":"content","text":"specific YouTube FK episode task","time":"12:00","pts":4},
+                  {"id":"ed","cat":"content","text":"Edit & upload FK video","time":"14:30","pts":4},
+                  {"id":"br","cat":"finance","text":"specific brokerage study","time":"17:00","pts":3}
+                ],
+                "sunday": [
+                  {"id":"q","cat":"quran","text":"personalized quran review","time":"09:00","pts":3},
+                  {"id":"g","cat":"gym","text":"Gym — Full session","time":"10:00","pts":3},
+                  {"id":"br","cat":"finance","text":"specific weekly brokerage review","time":"12:00","pts":3},
+                  {"id":"wr","cat":"plan","text":"Weekly review + plan next week","time":"18:00","pts":3}
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "school",
+      "name": "School Quarter",
+      "period": "Sep–Nov 2026",
+      "theme": "short theme",
+      "goals": ["3-5 goals"],
+      "months": [
+        {
+          "month": 9, "name": "September", "focus": "string", "goals": ["3 goals"],
+          "weeks": [{"startDate":"2026-09-01","num":1,"theme":"string","quranSurah":null,"weekFocus":"string","tasks":{"weekday":[{"id":"wk","cat":"work","text":"Work shift (01–09)","time":"01:00","pts":1},{"id":"q","cat":"quran","text":"Quran (20 min)","time":"09:00","pts":3},{"id":"g1","cat":"gym","text":"Gym — Cardio","time":"09:30","pts":3},{"id":"ru","cat":"russian","text":"Russian class (1hr)","time":"10:30","pts":3},{"id":"sc","cat":"study","text":"Law school (13:00–18:30)","time":"13:00","pts":1},{"id":"g2","cat":"gym","text":"Gym — Weights","time":"19:30","pts":3},{"id":"pl","cat":"plan","text":"Plan tomorrow","time":"21:30","pts":2}],"saturday":[{"id":"q","cat":"quran","text":"Quran","time":"09:00","pts":3},{"id":"g","cat":"gym","text":"Full gym session","time":"10:00","pts":3},{"id":"yt","cat":"content","text":"Film/edit YouTube","time":"12:00","pts":4},{"id":"ru","cat":"russian","text":"Russian self-study","time":"16:00","pts":3}],"sunday":[{"id":"q","cat":"quran","text":"Quran review","time":"09:00","pts":3},{"id":"g","cat":"gym","text":"Full gym","time":"10:00","pts":3},{"id":"uz","cat":"business","text":"Uzum marketplace study","time":"13:00","pts":3},{"id":"wr","cat":"plan","text":"Weekly review","time":"18:00","pts":3}]}}]
+        },
+        {"month":10,"name":"October","focus":"string","goals":["string"],"weeks":[]},
+        {"month":11,"name":"November","focus":"string","goals":["string"],"weeks":[]}
+      ]
+    },
+    {
+      "id": "final",
+      "name": "Final Quarter",
+      "period": "Dec 2026",
+      "theme": "string",
+      "goals": ["2-3 goals"],
+      "months": [{"month":12,"name":"December","focus":"string","goals":["string"],"weeks":[]}]
+    }
+  ]
+}
+
+RULES:
+- ONLY generate full week tasks for June, July, August (14 weeks total)
+- For Sep/Oct/Nov/Dec weeks array: leave empty [] — tasks are handled by app defaults
+- Task text should be SPECIFIC to the week theme, not generic
+- Quran surahs follow this schedule: Jun1=An-Nas(114), Jun8=Al-Falaq(113), Jun15=Al-Ikhlas(112), Jun22=Al-Masad(111), Jun29=An-Nasr(110), Jul6=Al-Kafirun(109), Jul13=Al-Kawthar(108), Jul20=Al-Ma'un(107), Jul27=Quraysh(106), Aug3=Al-Fil(105), Aug10=Al-Humazah(104), Aug17=Al-Asr(103), Aug24=At-Takathur(102), Aug31=Al-Qari'ah(101)
+- Summer week dates: Jun1, Jun8, Jun15, Jun22, Jun29, Jul6, Jul13, Jul20, Jul27, Aug3, Aug10, Aug17, Aug24, Aug31
+- For YouTube: FK = Fuqarolik Kodeksi series, episodes 1-12 across summer Saturdays`
+      }, {
+        role: 'user',
+        content: `Generate my complete 2026 life plan.
+
+MY GOALS:
+${goals}
+
+MY SITUATION:
+${situation}
+
+MY 10-YEAR VISION:
+${vision}
+
+Today: ${startDate || new Date().toISOString().split('T')[0]}
+Be deeply specific. Make every task text reference the actual goal for that week.`
+      }],
+      max_tokens: 4000,
+      temperature: 0.6,
+    });
+
+    const plan = JSON.parse(resp.choices[0].message.content);
+    plan.generatedAt = new Date().toISOString().split('T')[0];
+    res.json({ plan });
+  } catch(e) {
+    console.error('Generate plan error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.post('/subscribe', (req, res) => {
   const sub = req.body;
   if (!sub || !sub.endpoint) return res.status(400).json({ error: 'Invalid subscription' });

@@ -787,6 +787,7 @@ hr{ border-color: rgba(201,168,76,0.07); }
   <div class="ntab" onclick="showSec('weekly',this)"><span class="nav-icon"><i class="fa-solid fa-calendar-week"></i></span> Weekly</div>
   <div class="ntab" onclick="showSec('monthly',this)"><span class="nav-icon"><i class="fa-solid fa-calendar"></i></span> Monthly</div>
   <div class="ntab" onclick="showSec('tracker',this)"><span class="nav-icon"><i class="fa-solid fa-chart-line"></i></span> Tracker</div>
+  <div class="ntab" onclick="showSec('aiplan',this)"><span class="nav-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></span> AI Plan</div>
   <div class="ntab" onclick="showSec('vision',this)"><span class="nav-icon"><i class="fa-solid fa-eye"></i></span> Vision</div>
   <div class="ntab" onclick="showSec('diet',this)"><span class="nav-icon"><i class="fa-solid fa-leaf"></i></span> Diet</div>
   <div class="ntab" onclick="showSec('money',this)"><span class="nav-icon"><i class="fa-solid fa-coins"></i></span> Money</div>
@@ -1174,6 +1175,7 @@ hr{ border-color: rgba(201,168,76,0.07); }
     <button class="btn" id="nextDay" onclick="changeDay(1)">Next →</button>
     <button class="btn btn-gold" onclick="goToday()">Today</button>
   </div>
+  <div id="aiWeekBanner" style="display:none;margin:8px 16px 0;padding:7px 14px;background:rgba(201,168,76,0.08);border:1px solid rgba(201,168,76,0.2);border-radius:8px;font-size:0.74rem;color:var(--text);line-height:1.4;"></div>
   <div id="dayContent"></div>
 </div>
 
@@ -1322,6 +1324,77 @@ hr{ border-color: rgba(201,168,76,0.07); }
 </div>
 
 <!-- VISION -->
+<!-- AI PLAN SECTION -->
+<div class="sec" id="sec-aiplan">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:20px;">
+    <div>
+      <div class="sec-title"><span class="sec-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></span> AI Life Plan</div>
+      <div class="sec-sub" style="margin-bottom:0" id="planSubtitle">Generate your complete 2026 plan — from 10-year vision down to daily tasks.</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-gold" id="planGenBtn" onclick="togglePlanForm()">✨ Generate My Plan</button>
+      <button class="btn" id="planClearBtn" onclick="clearAIPlan()" style="display:none">🗑 Clear Plan</button>
+    </div>
+  </div>
+
+  <!-- FORM -->
+  <div id="planForm" style="display:none;margin-bottom:20px;">
+    <div class="task-card" style="margin-bottom:14px;">
+      <div class="task-card-hdr" style="color:var(--gold)">🎯 Your Big Goals (Summer 2026)</div>
+      <textarea id="planGoals" rows="5" style="width:100%;margin-top:8px;font-size:0.8rem;line-height:1.6;">- 🕌 Pray all 5 prayers on time every day
+- 💪 Lose weight: 105kg → 90kg by September (gym daily, no bread/no sugar)
+- 📈 Master brokerage, tender and auction — study every weekday
+- 🎬 YouTube FK series: 1 video every Saturday, episodes 1–12 by September
+- 💰 Save 80% of salary every month for car fund</textarea>
+    </div>
+    <div class="task-card" style="margin-bottom:14px;">
+      <div class="task-card-hdr" style="color:var(--gold)">📋 Your Current Situation</div>
+      <textarea id="planSituation" rows="5" style="width:100%;margin-top:8px;font-size:0.8rem;line-height:1.6;">- Work: logistics shift 01:00–09:00 every day
+- Sleep: 09:30–13:00 and 21:00–00:00 (split sleep)
+- Location: Tashkent, Uzbekistan (UTC+5)
+- Diet rule: no bread, no sugar — strict
+- Law school starts September 2026 (13:00–18:30)
+- Russian classes restart September 2026
+- Currently: summer break — pure focus on 4 goals</textarea>
+    </div>
+    <div class="task-card" style="margin-bottom:14px;">
+      <div class="task-card-hdr" style="color:var(--gold)">🔭 Your 10-Year Vision (by 2035)</div>
+      <textarea id="planVision" rows="4" style="width:100%;margin-top:8px;font-size:0.8rem;line-height:1.6;">By 2035 I am financially free — running my own business generating $5,000+/month, fluent in Russian, completed Quran memorization, own a car and saving for a house, no 9-to-5 job, respected in my community for knowledge and discipline. I started from zero and built everything through consistency.</textarea>
+    </div>
+    <button class="btn btn-gold" onclick="generatePlan()" style="width:100%;padding:14px;font-size:0.9rem;font-weight:700;">
+      ✨ Generate My Complete Plan
+    </button>
+  </div>
+
+  <!-- LOADING -->
+  <div id="planLoading" style="display:none;text-align:center;padding:60px 20px;">
+    <div class="loading-spinner" style="margin:0 auto 20px;"></div>
+    <div style="color:var(--gold);font-size:1rem;font-weight:600;margin-bottom:8px;">AI is building your plan...</div>
+    <div style="color:var(--muted);font-size:0.8rem;" id="planLoadingMsg">Analysing your goals and situation</div>
+  </div>
+
+  <!-- PLAN DISPLAY -->
+  <div id="planDisplay" style="display:none;">
+    <!-- 10-Year Vision -->
+    <div class="task-card" style="margin-bottom:16px;border-color:rgba(201,168,76,0.3);">
+      <div class="task-card-hdr" style="color:var(--gold)">🔭 10-Year Vision → 2035</div>
+      <div id="planVisionDisplay" style="margin-top:8px;"></div>
+    </div>
+    <!-- Quarters -->
+    <div id="planQuarters"></div>
+  </div>
+
+  <!-- Empty state -->
+  <div id="planEmpty">
+    <div style="text-align:center;padding:60px 20px;color:var(--muted);">
+      <div style="font-size:3rem;margin-bottom:16px;">🤖</div>
+      <div style="font-size:1rem;font-weight:600;color:var(--text);margin-bottom:8px;">No plan generated yet</div>
+      <div style="font-size:0.8rem;margin-bottom:24px;">Click "✨ Generate My Plan" and let AI build your complete 2026 roadmap.</div>
+      <div style="font-size:0.75rem;opacity:0.6;">10-year vision → quarterly goals → monthly focus → weekly tasks → daily schedule</div>
+    </div>
+  </div>
+</div>
+
 <div class="sec" id="sec-vision">
   <div class="sec-title"><span class="sec-icon"><i class="fa-solid fa-eye"></i></span> 10-Year Vision (2025–2035)</div>
   <div class="sec-sub">Your 7 life pillars — everything in 2026 feeds these.</div>
@@ -1597,6 +1670,10 @@ function getFinanceVideoForDate(date) {
 }
 
 function getTasksForDate(date) {
+  // If AI plan is active, use AI-generated tasks
+  const aiTasks = (typeof getAITasksForDate === 'function') ? getAITasksForDate(date) : null;
+  if (aiTasks && aiTasks.length > 0) return aiTasks;
+
   const t = getDayType(date);
   const vid = getFinanceVideoForDate(date);
   const fiText = `📺 Watch: ${vid.title}`;
@@ -1866,6 +1943,18 @@ function renderDaily() {
     d.getDate()+' '+MONTHS_SHORT[d.getMonth()+1]+' 2026';
   document.getElementById('prevDay').disabled=d<=START;
   document.getElementById('nextDay').disabled=d>=END;
+
+  // Show AI week theme banner if plan is active
+  const _aiWeek = (typeof getAIWeekInfo === 'function') ? getAIWeekInfo(d) : null;
+  const _weekBanner = document.getElementById('aiWeekBanner');
+  if (_weekBanner) {
+    if (_aiWeek) {
+      _weekBanner.style.display = 'block';
+      _weekBanner.innerHTML = `<span style="color:var(--gold);font-weight:700;">Week ${_aiWeek.num}:</span> ${_aiWeek.theme}${_aiWeek.quranSurah?' &nbsp;·&nbsp; 📖 '+_aiWeek.quranSurah:''}`;
+    } else {
+      _weekBanner.style.display = 'none';
+    }
+  }
 
   const tasks=getTasksForDate(d);
   const stats=dayStats(d);
@@ -3427,6 +3516,7 @@ function showSec(id,tab){
   else if(id==='reflect') { renderReflect(); setTimeout(renderReflectChart, 50); }
   else if(id==='tracker') { setTimeout(renderWeightChart, 50); }
   else if(id==='youtube') renderYoutube();
+  else if(id==='aiplan')  { if(typeof renderAIPlan==='function' && aiPlanState) renderAIPlan(); }
   else if(id==='tracker')   { renderTracker(); renderStreakWall(); }
   else renderAll();
 }
@@ -3781,7 +3871,8 @@ window.saveAllData = async function() {
   // Patch the Firebase save to include weight field
   const origSetDoc = window._fbSetDoc;
   window._fbSetDoc = function(ref, data, opts) {
-    data.weight = JSON.stringify(weightState || {});
+    data.weight  = JSON.stringify(weightState || {});
+    data.aiPlan  = aiPlanState ? JSON.stringify(aiPlanState) : null;
     window._fbSetDoc = origSetDoc; // restore
     return origSetDoc(ref, data, opts);
   };
@@ -3791,12 +3882,22 @@ window.saveAllData = async function() {
 // Patch _onFirebaseLoaded to load weight
 const _origLoaded = window._onFirebaseLoaded;
 window._onFirebaseLoaded = function() {
-  weightState = window._weightState || {};
+  weightState  = window._weightState  || {};
+  aiPlanState  = window._aiPlanState  || null;
   if (_origLoaded) _origLoaded();
   renderWeightChart();
   renderBestDay();
   renderMonthCompare();
   renderReflectChart();
+  // Restore AI plan UI if a saved plan exists
+  if (aiPlanState) {
+    document.getElementById('planDisplay').style.display  = 'block';
+    document.getElementById('planEmpty').style.display    = 'none';
+    document.getElementById('planClearBtn').style.display = 'inline-flex';
+    document.getElementById('planSubtitle').textContent   = `Last generated: ${aiPlanState.generatedAt || 'saved'} · Tasks auto-populated into Daily view`;
+    renderAIPlan();
+    renderAll();
+  }
 };
 
 // Also patch Firebase load to extract weight
@@ -3810,7 +3911,8 @@ window._loadFromFirebase = async function() {
     const origData   = snap.data.bind(snap);
     snap.data = function() {
       const d = origData();
-      window._weightState = d.weight ? JSON.parse(d.weight) : {};
+      window._weightState  = d.weight  ? JSON.parse(d.weight)  : {};
+      window._aiPlanState  = d.aiPlan  ? JSON.parse(d.aiPlan)  : null;
       return d;
     };
     window._fbGetDoc = origGetDoc; // restore
@@ -3819,6 +3921,194 @@ window._loadFromFirebase = async function() {
   return _origLoadFb ? _origLoadFb() : undefined;
 };
 
+
+// ═══════════════════════════════════════════
+// AI PLAN STATE + LOGIC
+// ═══════════════════════════════════════════
+let aiPlanState = null; // full plan object from AI
+const AI_BOT = 'https://life-planner-bot-1r4w.onrender.com';
+
+function togglePlanForm() {
+  const form = document.getElementById('planForm');
+  const empty = document.getElementById('planEmpty');
+  const disp  = document.getElementById('planDisplay');
+  const isOpen = form.style.display !== 'none';
+  form.style.display  = isOpen ? 'none' : 'block';
+  if (!aiPlanState) { empty.style.display = isOpen ? 'block' : 'none'; disp.style.display='none'; }
+  document.getElementById('planGenBtn').textContent = isOpen ? '✨ Generate My Plan' : '✕ Cancel';
+}
+
+async function generatePlan() {
+  const goals     = document.getElementById('planGoals').value.trim();
+  const situation = document.getElementById('planSituation').value.trim();
+  const vision    = document.getElementById('planVision').value.trim();
+  if (!goals) { alert('Please fill in your goals.'); return; }
+
+  document.getElementById('planForm').style.display    = 'none';
+  document.getElementById('planEmpty').style.display   = 'none';
+  document.getElementById('planDisplay').style.display = 'none';
+  document.getElementById('planLoading').style.display = 'block';
+  document.getElementById('planGenBtn').textContent    = '✨ Generate My Plan';
+
+  const msgs = ['Analysing your goals and situation…','Building 10-year vision…','Planning Summer quarter tasks…','Crafting weekly schedules…','Finalising your personal roadmap…'];
+  let mi = 0;
+  const msgEl = document.getElementById('planLoadingMsg');
+  const ticker = setInterval(() => { if (mi < msgs.length-1) msgEl.textContent = msgs[++mi]; }, 8000);
+
+  try {
+    const resp = await fetch(AI_BOT + '/generate-plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        goals, situation, vision,
+        startDate: new Date().toISOString().split('T')[0]
+      })
+    });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    aiPlanState = data.plan;
+    window._aiPlanState = aiPlanState;
+    scheduleSave();
+    clearInterval(ticker);
+    document.getElementById('planLoading').style.display  = 'none';
+    document.getElementById('planDisplay').style.display  = 'block';
+    document.getElementById('planClearBtn').style.display = 'inline-flex';
+    document.getElementById('planSubtitle').textContent   = `Last generated: ${aiPlanState.generatedAt} · Tasks auto-populated into Daily view`;
+    renderAIPlan();
+    renderAll(); // refresh daily view with new tasks
+  } catch(e) {
+    clearInterval(ticker);
+    document.getElementById('planLoading').style.display = 'none';
+    document.getElementById('planEmpty').style.display   = 'block';
+    alert('❌ Error generating plan: ' + e.message + '\n\nMake sure your Render bot server is running.');
+  }
+}
+
+function clearAIPlan() {
+  if (!confirm('Clear the AI-generated plan? Daily tasks will revert to defaults.')) return;
+  aiPlanState = null;
+  window._aiPlanState = null;
+  scheduleSave();
+  document.getElementById('planDisplay').style.display  = 'none';
+  document.getElementById('planEmpty').style.display    = 'block';
+  document.getElementById('planClearBtn').style.display = 'none';
+  document.getElementById('planSubtitle').textContent   = 'Generate your complete 2026 plan — from 10-year vision down to daily tasks.';
+  renderAll();
+}
+
+function getAITasksForDate(date) {
+  if (!aiPlanState || !aiPlanState.quarters) return null;
+  const dateStr = dateKey(date);
+  const dow = date.getDay(); // 0=Sun, 6=Sat
+  for (const quarter of aiPlanState.quarters) {
+    for (const month of (quarter.months || [])) {
+      for (const week of (month.weeks || [])) {
+        if (!week.startDate || !week.tasks) continue;
+        const wStart = new Date(week.startDate);
+        const wEnd   = new Date(wStart); wEnd.setDate(wEnd.getDate() + 6);
+        const d      = new Date(dateStr);
+        if (d >= wStart && d <= wEnd) {
+          if (dow === 6) return week.tasks.saturday || null;
+          if (dow === 0) return week.tasks.sunday   || null;
+          return week.tasks.weekday || null;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function getAIWeekInfo(date) {
+  if (!aiPlanState || !aiPlanState.quarters) return null;
+  const dateStr = dateKey(date);
+  for (const quarter of aiPlanState.quarters) {
+    for (const month of (quarter.months || [])) {
+      for (const week of (month.weeks || [])) {
+        if (!week.startDate) continue;
+        const wStart = new Date(week.startDate);
+        const wEnd   = new Date(wStart); wEnd.setDate(wEnd.getDate() + 6);
+        if (new Date(dateStr) >= wStart && new Date(dateStr) <= wEnd) return week;
+      }
+    }
+  }
+  return null;
+}
+
+function renderAIPlan() {
+  if (!aiPlanState) return;
+  const v = aiPlanState.vision || {};
+
+  // Vision
+  document.getElementById('planVisionDisplay').innerHTML = `
+    <div style="font-size:0.9rem;color:var(--text);line-height:1.6;margin-bottom:12px;">"${v.tenYear || ''}"</div>
+    <div style="font-size:0.78rem;color:var(--muted);margin-bottom:10px;">2026: ${v.oneYear || ''}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      ${(v.values||[]).map(val => `<span style="background:rgba(201,168,76,0.1);border:1px solid rgba(201,168,76,0.2);color:var(--gold);padding:3px 10px;border-radius:20px;font-size:0.68rem;">${val}</span>`).join('')}
+    </div>
+    ${Object.keys(v.milestones||{}).length ? `<div style="margin-top:12px;display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
+      ${Object.entries(v.milestones).map(([yr,ms])=>`<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(201,168,76,0.08);border-radius:8px;padding:8px 10px;">
+        <div style="font-size:0.65rem;color:var(--gold);font-weight:700;">${yr}</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:2px;">${ms}</div>
+      </div>`).join('')}
+    </div>` : ''}`;
+
+  // Quarters
+  const QCOLORS = { summer:'#C9A84C', school:'#4A90D9', final:'#4CAF7D' };
+  document.getElementById('planQuarters').innerHTML = (aiPlanState.quarters||[]).map(q => {
+    const qc = QCOLORS[q.id] || '#C9A84C';
+    const months = (q.months||[]).map(m => {
+      const weeks = (m.weeks||[]).map(w => `
+        <div style="padding:8px 12px;border-left:2px solid rgba(201,168,76,0.15);margin-left:12px;margin-bottom:4px;">
+          <div style="display:flex;align-items:center;gap:8px;cursor:pointer;" onclick="toggleWeekDetail('${w.startDate}')">
+            <div style="font-size:0.68rem;color:var(--gold);min-width:50px;">${w.startDate?w.startDate.slice(5):''}</div>
+            <div style="font-size:0.75rem;color:var(--text);flex:1;"><b>Week ${w.num}</b> — ${w.theme}</div>
+            ${w.quranSurah ? `<div style="font-size:0.62rem;background:rgba(201,168,76,0.1);color:var(--gold);padding:2px 7px;border-radius:10px;">📖 ${w.quranSurah}</div>` : ''}
+            <div style="font-size:0.65rem;color:var(--muted);">▼</div>
+          </div>
+          <div id="week-${w.startDate}" style="display:none;margin-top:8px;">
+            <div style="font-size:0.72rem;color:var(--muted);margin-bottom:8px;font-style:italic;">${w.weekFocus||''}</div>
+            ${['weekday','saturday','sunday'].map(type => {
+              const tasks = (w.tasks||{})[type]||[];
+              return tasks.length ? `<div style="margin-bottom:6px;">
+                <div style="font-size:0.62rem;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">${type==='weekday'?'Mon–Fri':type==='saturday'?'Saturday':'Sunday'}</div>
+                ${tasks.map(t=>`<div style="display:flex;gap:6px;align-items:flex-start;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.03);">
+                  <div style="font-size:0.62rem;color:var(--muted);min-width:36px;">${t.time}</div>
+                  <div style="width:6px;height:6px;border-radius:50%;background:${(CATS[t.cat]||{color:'#888'}).color};flex-shrink:0;margin-top:3px;"></div>
+                  <div style="font-size:0.73rem;color:var(--text);">${t.text}</div>
+                </div>`).join('')}
+              </div>` : '';
+            }).join('')}
+          </div>
+        </div>`).join('');
+
+      return `<div style="margin-bottom:12px;">
+        <div style="font-size:0.72rem;font-weight:700;color:var(--text);margin-bottom:6px;padding:6px 10px;background:rgba(255,255,255,0.03);border-radius:8px;display:flex;align-items:center;gap:8px;">
+          <span style="color:${qc};">●</span> ${m.name} — ${m.focus||''}
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;padding-left:10px;">
+          ${(m.goals||[]).map(g=>`<div style="font-size:0.68rem;color:var(--muted);background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);padding:2px 8px;border-radius:4px;">✓ ${g}</div>`).join('')}
+        </div>
+        ${weeks}
+      </div>`;
+    }).join('');
+
+    return `<div class="task-card" style="margin-bottom:16px;border-color:${qc}33;">
+      <div class="task-card-hdr" style="color:${qc};">${q.name} <span style="font-weight:400;font-size:0.7rem;color:var(--muted);">${q.period}</span></div>
+      <div style="font-size:0.82rem;color:var(--text);margin:8px 0 4px;font-style:italic;">"${q.theme}"</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+        ${(q.goals||[]).map(g=>`<div style="font-size:0.7rem;color:${qc};background:${qc}15;border:1px solid ${qc}33;padding:3px 10px;border-radius:12px;">→ ${g}</div>`).join('')}
+      </div>
+      ${months}
+    </div>`;
+  }).join('');
+
+  document.getElementById('planClearBtn').style.display = 'inline-flex';
+}
+
+function toggleWeekDetail(startDate) {
+  const el = document.getElementById('week-' + startDate);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
 
 // ═══════════════════════════════════════════
 // QURAN SURAH SCHEDULE
