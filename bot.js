@@ -166,7 +166,38 @@ I'll send you reminders automatically throughout the day (Tashkent UTC+5).`);
 });
 
 bot.onText(/\/schedule/, () => remind(getDailySchedule()));
-bot.onText(/\/motive/, () => remind(MOTIVE));
+
+bot.onText(/\/motive/, () => {
+  // Send to Telegram with a button to also push to browser
+  bot.sendMessage(CHAT_ID, MOTIVE, {
+    parse_mode: 'HTML',
+    reply_markup: {
+      inline_keyboard: [[
+        { text: '🌐 Send to Browser too', callback_data: 'push_motive' }
+      ]]
+    }
+  }).catch(err => console.error('TG error:', err.message));
+});
+
+// Handle the inline button press
+bot.on('callback_query', (query) => {
+  if (query.data === 'push_motive') {
+    const count = loadSubs().length;
+    if (count === 0) {
+      bot.answerCallbackQuery(query.id, {
+        text: '⚠️ No browser subscriptions yet. Open your planner site and enable notifications first.',
+        show_alert: true
+      });
+      return;
+    }
+    push('💎 Motivation', MOTIVE.replace(/<[^>]+>/g, ''));
+    bot.answerCallbackQuery(query.id, {
+      text: `✅ Sent to ${count} browser${count > 1 ? 's' : ''}!`,
+      show_alert: false
+    });
+  }
+});
+
 bot.onText(/\/chatid/, (msg) => tg(`Your chat ID: <code>${msg.chat.id}</code>`));
 bot.onText(/\/status/, () => {
   const now = new Date(Date.now() + 5 * 3600 * 1000);
