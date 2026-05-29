@@ -1407,7 +1407,7 @@ hr{ border-color: rgba(201,168,76,0.07); }
 // FIREBASE CONFIG + STORAGE
 // ═══════════════════════════════════════════
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyA7AwtfRArmS-hz0uIf4teeg6mp-kduiKk",
@@ -1420,51 +1420,38 @@ const firebaseConfig = {
 
 const fbApp = initializeApp(firebaseConfig);
 const db    = getFirestore(fbApp);
-const USER_DOC = 'azizbek2026'; // your personal save slot
+const USER_DOC_REF = doc(db, 'lifeplanner', 'azizbek2026');
 
-// Expose Firebase functions to global scope so onclick works
-window._fbDb = db;
-window._fbDoc = doc;
+// Expose for legacy save patches
+window._fbDb     = db;
+window._fbDoc    = doc;
 window._fbSetDoc = setDoc;
-window._fbGetDoc = getDoc;
 
+// ── SAVE ────────────────────────────────────────────────────────────────────
 window.saveAllData = async function() {
-  const state        = window._appState;
-  const dietState    = window._dietState;
-  const moneyState   = window._moneyState;
-  const savingsState = window._savingsState;
-  const prayerState  = window._prayerState;
-  const workoutState = window._workoutState;
-  const reflectState = window._reflectState;
-  const ytState      = window._ytState;
-
   const btn = document.getElementById('globalSaveBtn');
-  if(btn){ btn.disabled=true; btn.textContent='Saving...'; }
   const dot = document.getElementById('saveDot');
   const lbl = document.getElementById('saveLabel');
+  if(btn){ btn.disabled=true; btn.textContent='Saving...'; }
   if(dot) dot.className='save-dot saving';
   if(lbl) lbl.textContent='Saving to cloud...';
   try {
-    await window._fbSetDoc(window._fbDoc(window._fbDb,'lifeplanner','azizbek2026'), {
-      tasks:   JSON.stringify(state||{}),
-      diet:    JSON.stringify(dietState||{}),
-      money:   JSON.stringify(moneyState||{}),
-      savings: JSON.stringify(savingsState||{}),
-      prayer:  JSON.stringify(prayerState||{}),
-      workout: JSON.stringify(workoutState||{}),
-      reflect: JSON.stringify(reflectState||{}),
-      youtube: JSON.stringify(ytState||{}),
+    const payload = {
+      tasks:   JSON.stringify(window._appState    ||{}),
+      diet:    JSON.stringify(window._dietState   ||{}),
+      money:   JSON.stringify(window._moneyState  ||{}),
+      savings: JSON.stringify(window._savingsState||{}),
+      prayer:  JSON.stringify(window._prayerState ||{}),
+      workout: JSON.stringify(window._workoutState||{}),
+      reflect: JSON.stringify(window._reflectState||{}),
+      youtube: JSON.stringify(window._ytState     ||{}),
+      weight:  JSON.stringify(window._weightState ||{}),
+      aiPlan:  window._aiPlanState ? JSON.stringify(window._aiPlanState) : null,
       savedAt: new Date().toISOString(),
-    });
-    // backup to localStorage
-    localStorage.setItem('tasks',   JSON.stringify(state||{}));
-    localStorage.setItem('diet',    JSON.stringify(dietState||{}));
-    localStorage.setItem('money',   JSON.stringify(moneyState||{}));
-    localStorage.setItem('savings', JSON.stringify(savingsState||{}));
-    localStorage.setItem('prayer',  JSON.stringify(prayerState||{}));
-    localStorage.setItem('workout', JSON.stringify(workoutState||{}));
-    localStorage.setItem('reflect', JSON.stringify(reflectState||{}));
-    localStorage.setItem('youtube', JSON.stringify(ytState||{}));
+    };
+    await setDoc(USER_DOC_REF, payload);
+    // localStorage backup
+    Object.entries(payload).forEach(([k,v]) => v != null && localStorage.setItem(k, v));
     if(dot) dot.className='save-dot saved';
     if(lbl) lbl.textContent='Saved to cloud ✓';
     if(btn){ btn.style.background='#4CAF7D'; btn.style.color='#000';
@@ -1479,39 +1466,52 @@ window.saveAllData = async function() {
   }
 };
 
-window._loadFromFirebase = async function() {
-  try {
-    const snap = await window._fbGetDoc(window._fbDoc(window._fbDb,'lifeplanner','azizbek2026'));
-    if(snap.exists()) {
-      const d = snap.data();
-      window._appState    = JSON.parse(d.tasks   ||'{}');
-      window._dietState   = JSON.parse(d.diet    ||'{}');
-      window._moneyState  = JSON.parse(d.money   ||'{}');
-      window._savingsState= JSON.parse(d.savings ||'{}');
-      window._prayerState = JSON.parse(d.prayer  ||'{}');
-      window._workoutState= JSON.parse(d.workout ||'{}');
-      window._reflectState= JSON.parse(d.reflect ||'{}');
-      window._ytState     = JSON.parse(d.youtube ||'{}');
-    }
-    const dot=document.getElementById('saveDot');
-    const lbl=document.getElementById('saveLabel');
-    if(dot) dot.className='save-dot saved';
-    if(lbl) lbl.textContent='Loaded from cloud ✓';
-    // Signal app logic that data is ready
-    if(window._onFirebaseLoaded) window._onFirebaseLoaded();
-  } catch(e) {
-    console.error('Load error:',e);
-    const lbl=document.getElementById('saveLabel');
-    if(lbl) lbl.textContent='Using local backup';
-    if(window._onFirebaseLoaded) window._onFirebaseLoaded();
-  }
-};
+// ── REAL-TIME LISTENER ──────────────────────────────────────────────────────
+// Fires immediately on load, then again whenever ANY device saves.
+// hasPendingWrites=true means WE just wrote it — skip re-applying our own save.
+let _firstLoad = true;
+function _applySnapshot(snap) {
+  if (!snap.exists()) { if(window._onFirebaseLoaded) window._onFirebaseLoaded(); return; }
+  // Skip re-render when this device is the author of the write
+  if (!_firstLoad && snap.metadata.hasPendingWrites) return;
+  _firstLoad = false;
 
-// Trigger load after DOM ready
+  const d = snap.data();
+  window._appState     = JSON.parse(d.tasks   ||'{}');
+  window._dietState    = JSON.parse(d.diet    ||'{}');
+  window._moneyState   = JSON.parse(d.money   ||'{}');
+  window._savingsState = JSON.parse(d.savings ||'{}');
+  window._prayerState  = JSON.parse(d.prayer  ||'{}');
+  window._workoutState = JSON.parse(d.workout ||'{}');
+  window._reflectState = JSON.parse(d.reflect ||'{}');
+  window._ytState      = JSON.parse(d.youtube ||'{}');
+  window._weightState  = d.weight ? JSON.parse(d.weight) : {};
+  window._aiPlanState  = d.aiPlan ? JSON.parse(d.aiPlan) : null;
+
+  const dot=document.getElementById('saveDot');
+  const lbl=document.getElementById('saveLabel');
+  if(dot) dot.className='save-dot saved';
+  if(lbl) lbl.textContent = snap.metadata.fromCache ? 'Offline — cached data' : 'Synced ✓';
+
+  if(window._onFirebaseLoaded) window._onFirebaseLoaded();
+}
+
+function _startListener() {
+  onSnapshot(USER_DOC_REF, { includeMetadataChanges: true }, _applySnapshot, (e) => {
+    console.error('Firestore listener error:', e);
+    const lbl=document.getElementById('saveLabel');
+    if(lbl) lbl.textContent='Sync error — using local data';
+    if(window._onFirebaseLoaded) window._onFirebaseLoaded();
+  });
+}
+
+// Keep legacy stub so old patch code doesn't crash
+window._loadFromFirebase = () => {};
+
 if(document.readyState==='loading'){
-  document.addEventListener('DOMContentLoaded', ()=>window._loadFromFirebase());
+  document.addEventListener('DOMContentLoaded', _startListener);
 } else {
-  window._loadFromFirebase();
+  _startListener();
 }
 </script>
 <script>
@@ -1529,7 +1529,8 @@ window._ytState      = {};
 let state        = window._appState;
 let unsavedChanges = false;
 
-// Called by Firebase module once data is loaded
+// Called by Firebase module on first load AND on every remote sync
+let _appInitialized = false;
 window._onFirebaseLoaded = function() {
   state        = window._appState;
   dietState    = window._dietState;
@@ -1539,9 +1540,22 @@ window._onFirebaseLoaded = function() {
   workoutState = window._workoutState;
   reflectState = window._reflectState;
   ytState      = window._ytState;
-  document.getElementById('loadingOverlay').style.display='none';
-  renderDashboard();
-  renderMoney();
+
+  if (!_appInitialized) {
+    // First load: full init
+    _appInitialized = true;
+    document.getElementById('loadingOverlay').style.display='none';
+    renderDashboard();
+    renderMoney();
+  } else {
+    // Remote sync from another device: re-render current visible section
+    renderAll();
+    const dot=document.getElementById('saveDot');
+    const lbl=document.getElementById('saveLabel');
+    if(dot) dot.className='save-dot saved';
+    if(lbl) lbl.textContent='Synced from another device ✓';
+    setTimeout(()=>{ if(lbl) lbl.textContent='Synced ✓'; }, 3000);
+  }
 };
 
 function setSaveStatus(status, msg) {
@@ -1557,7 +1571,7 @@ function saveToCloud() {} // stub — real save via saveAllData
 
 function scheduleSave() {
   unsavedChanges = true;
-  // Sync to window globals so Firebase module can access latest state
+  // Sync ALL state to window globals so saveAllData picks up everything
   window._appState     = state;
   window._dietState    = dietState;
   window._moneyState   = moneyState;
@@ -1566,6 +1580,9 @@ function scheduleSave() {
   window._workoutState = workoutState;
   window._reflectState = reflectState;
   window._ytState      = ytState;
+  // weight + aiPlan synced here too
+  if (typeof weightState  !== 'undefined') window._weightState  = weightState;
+  if (typeof aiPlanState  !== 'undefined') window._aiPlanState  = aiPlanState;
   setSaveStatus('saving', 'Unsaved — click Save!');
 }
 
@@ -3860,26 +3877,12 @@ function renderMonthCompare() {
 })();
 
 // ═══════════════════════════════════════════
-// WIRE INTO SAVE / LOAD / RENDER
+// WIRE WEIGHT + AI PLAN INTO FIREBASE
 // ═══════════════════════════════════════════
-// Patch scheduleSave to include weight
+// scheduleSave: sync weightState to window global before any save
 const _origScheduleSave = scheduleSave;
-// Override saveAllData to include weightState
-const _origSaveAll = window.saveAllData;
-window.saveAllData = async function() {
-  window._weightState = weightState;
-  // Patch the Firebase save to include weight field
-  const origSetDoc = window._fbSetDoc;
-  window._fbSetDoc = function(ref, data, opts) {
-    data.weight  = JSON.stringify(weightState || {});
-    data.aiPlan  = aiPlanState ? JSON.stringify(aiPlanState) : null;
-    window._fbSetDoc = origSetDoc; // restore
-    return origSetDoc(ref, data, opts);
-  };
-  return _origSaveAll ? _origSaveAll() : undefined;
-};
 
-// Patch _onFirebaseLoaded to load weight
+// _onFirebaseLoaded: runs on every Firestore snapshot (initial + remote updates)
 const _origLoaded = window._onFirebaseLoaded;
 window._onFirebaseLoaded = function() {
   weightState  = window._weightState  || {};
@@ -3898,27 +3901,6 @@ window._onFirebaseLoaded = function() {
     renderAIPlan();
     renderAll();
   }
-};
-
-// Also patch Firebase load to extract weight
-const _origLoadFb = window._loadFromFirebase;
-window._loadFromFirebase = async function() {
-  // intercept getDoc result
-  const origGetDoc = window._fbGetDoc;
-  window._fbGetDoc = async function(...args) {
-    const snap = await origGetDoc(...args);
-    const origExists = snap.exists.bind(snap);
-    const origData   = snap.data.bind(snap);
-    snap.data = function() {
-      const d = origData();
-      window._weightState  = d.weight  ? JSON.parse(d.weight)  : {};
-      window._aiPlanState  = d.aiPlan  ? JSON.parse(d.aiPlan)  : null;
-      return d;
-    };
-    window._fbGetDoc = origGetDoc; // restore
-    return snap;
-  };
-  return _origLoadFb ? _origLoadFb() : undefined;
 };
 
 
