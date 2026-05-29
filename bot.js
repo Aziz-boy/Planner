@@ -9,6 +9,7 @@ const path        = require('path');
 const OpenAI      = require('openai');
 const admin       = require('firebase-admin');
 const PDFDocument = require('pdfkit');
+const mammoth     = require('mammoth');
 
 // ── Telegram ──────────────────────────────────────────────────────────────────
 const TOKEN   = process.env.TELEGRAM_BOT_TOKEN;
@@ -407,20 +408,17 @@ async function analyzeArticle(header, body, docTitle) {
     model: 'gpt-4o',
     messages: [{
       role: 'system',
-      content: `Sen Azizbek uchun yuridik hujjatlarni tahlil qiluvchi yordamchisan. U Toshkentda huquq fakultetida o'qiydi va YouTube uchun video tushiradi.
-Har bir moddani quyidagi formatda tahlil qil (O'zbek tilida yoz):
-1. 📌 ASOSIY MA'NO — 1-2 jumlada sodda tilda
-2. 🔑 KALIT TUSHUNCHALAR — 3-5 ta muhim atama va ta'rifi
-3. ⚖️ AMALIY MISOL — real hayotdan 1 ta konkret misol
-4. ❓ VIDEO UCHUN SAVOL — tomoshabinlarga beriladigan 1 ta qiziqarli savol
-
-Qisqa, aniq, tushinarli yoz. Huquqiy jargondan qoching.`
+      content: `Sen Azizbek uchun yuridik hujjatlarni tahlil qiluvchi yordamchisan. U Toshkentda huquq fakultetida o'qiydi.
+Har bir moddani faqat 2 qismda tahlil qil (O'zbek tilida, qisqa):
+📌 ASOSIY MA'NO — 1-2 jumlada juda sodda tilda, oddiy odam tushuna olishi kerak
+🔑 KALIT TUSHUNCHALAR — 2-3 ta muhim atama va qisqa ta'rifi (har biri 1 qator)
+Boshqa hech narsa yozma. Juda qisqa va aniq bo'lsin.`
     }, {
       role: 'user',
-      content: `Hujjat: ${docTitle}\n\n${header}\n${body}`
+      content: `Hujjat: ${docTitle}\n\n${header}\n${body.slice(0, 800)}`
     }],
-    max_tokens: 400,
-    temperature: 0.5,
+    max_tokens: 200,
+    temperature: 0.4,
   });
   return resp.choices[0].message.content;
 }
@@ -754,13 +752,17 @@ bot.on('message', async (msg) => {
       pdfSessions.set(CHAT_ID, session);
       tg(`✅ Nom saqlandi: <b>${session.title}</b>
 
-Endi hujjat matnini yuboring.
-Barcha moddalar bo'lsa ham yuboring — men o'zim ajrataman.
-<i>Katta matn bo'lsa ham muammo yo'q.</i>`);
+Endi <b>.docx (Word fayl)</b> yuboring 📎
+<i>Telegram → qo'shimcha → fayl → Word hujjatingizni tanlang</i>`);
       return;
     }
 
     if (session.stage === 'waiting_text') {
+      tg('📨 Iltimos, <b>.docx</b> (Word) faylni yuboring — matn emas, fayl.');
+      return;
+    }
+    if (session.stage === 'waiting_doc_text') {
+      // fallback: accept raw text too
       const rawText = msg.text.trim();
       const articles = splitIntoArticles(rawText);
 
@@ -787,10 +789,11 @@ Barcha moddalar bo'lsa ham yuboring — men o'zim ajrataman.
         tg('📄 PDF yaratilmoqda...');
         const filePath = await generateLawPDF(session.title, articles, analyses);
 
-        await bot.sendDocument(CHAT_ID, filePath, {
-          caption: `✅ <b>${session.title}</b>\n${articles.length} ta modda tahlil qilindi.\n\n📺 YouTube video uchun tayyor!`,
-          parse_mode: 'HTML'
+        await bot.sendDocument(CHAT_ID, filePath, {}, {
+          filename: `${session.title.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
+          contentType: 'application/pdf'
         });
+        tg(`✅ <b>${session.title}</b>\n${articles.length} ta modda tahlil qilindi. PDF tayyor!`);
 
         fs.unlink(filePath, () => {}); // cleanup
       } catch(e) {
@@ -820,6 +823,85 @@ Barcha moddalar bo'lsa ham yuboring — men o'zim ajrataman.
       russianSessions.set(CHAT_ID, history);
       tg(reply);
     } catch(e) { tg(`❌ Error: ${e.message}`); }
+  }
+});
+
+// ── .docx file handler ────────────────────────────────────────────────────────
+bot.on('document', async (msg) => {
+  if (String(msg.chat.id) !== String(CHAT_ID)) return;
+
+  const doc  = msg.document;
+  const name = doc.file_name || '';
+  if (!name.endsWith('.docx') && !name.endsWith('.doc')) {
+    tg('⚠️ Faqat <b>.docx</b> (Word) fayl qabul qilinadi.');
+    return;
+  }
+
+  const session = pdfSessions.get(CHAT_ID);
+
+  // Auto-start session if not started — use filename as title
+  if (!session) {
+    const autoTitle = name.replace(/\.(docx|doc)$/i, '').replace(/_/g, ' ');
+    pdfSessions.set(CHAT_ID, { title: autoTitle, stage: 'waiting_text' });
+    tg(`📎 Fayl qabul qilindi: <b>${autoTitle}</b>\nTahlil boshlanmoqda...`);
+  } else if (session.stage !== 'waiting_text') {
+    tg('⚠️ Avval /pdf buyrug\'ini yuboring, keyin faylni jo\'nating.');
+    return;
+  } else {
+    tg(`📎 Fayl qabul qilindi. Tahlil boshlanmoqda...`);
+  }
+
+  const currentSession = pdfSessions.get(CHAT_ID);
+  pdfSessions.delete(CHAT_ID);
+
+  try {
+    // Download the file
+    const fileLink  = await bot.getFileLink(doc.file_id);
+    const https     = require('https');
+    const http      = require('http');
+    const tmpDocx   = path.join('/tmp', `doc_${Date.now()}.docx`);
+
+    await new Promise((resolve, reject) => {
+      const proto  = fileLink.startsWith('https') ? https : http;
+      const file   = fs.createWriteStream(tmpDocx);
+      proto.get(fileLink, res => { res.pipe(file); file.on('finish', resolve); })
+           .on('error', reject);
+    });
+
+    // Extract text from .docx
+    const result  = await mammoth.extractRawText({ path: tmpDocx });
+    fs.unlink(tmpDocx, () => {});
+    const rawText = result.value.trim();
+
+    if (!rawText) { tg('⚠️ Fayl bo\'sh yoki o\'qib bo\'lmadi.'); return; }
+
+    const articles = splitIntoArticles(rawText);
+    if (articles.length === 0) {
+      tg('⚠️ Moddalar topilmadi. Matn "Modda 1." yoki raqamli format bo\'lishi kerak.');
+      return;
+    }
+
+    tg(`📝 <b>${articles.length} ta modda topildi.</b>\nHar birini tahlil qilyapman... ⏳`);
+
+    const analyses = [];
+    for (let i = 0; i < articles.length; i++) {
+      if (i > 0 && i % 5 === 0) tg(`⏳ ${i}/${articles.length} tahlil qilindi...`);
+      analyses.push(await analyzeArticle(articles[i].header, articles[i].body, currentSession.title));
+    }
+
+    tg('📄 PDF yaratilmoqda...');
+    const pdfPath = await generateLawPDF(currentSession.title, articles, analyses);
+
+    await bot.sendDocument(CHAT_ID, pdfPath, {}, {
+      filename: `${currentSession.title.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
+      contentType: 'application/pdf'
+    });
+    tg(`✅ <b>${currentSession.title}</b> — ${articles.length} ta modda tahlil qilindi. PDF tayyor!`);
+    fs.unlink(pdfPath, () => {});
+
+  } catch(e) {
+    console.error('DOCX error:', e);
+    tg(`❌ Xato: ${e.message}`);
   }
 });
 
