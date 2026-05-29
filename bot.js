@@ -564,15 +564,44 @@ cron.schedule('0 0 * * *', () => remind(getDailySchedule()), { timezone: 'Asia/T
 // Motivational quote every 3 hours
 cron.schedule('0 0,3,6,9,12,15,18,21 * * *', () => remind(MOTIVE), { timezone: 'Asia/Tashkent' });
 
-// Daily AI Coach — 09:05 Tashkent (after work ends)
+// Daily AI Morning Briefing — 09:05 Tashkent (automatically fires /today logic)
 cron.schedule('5 9 * * *', async () => {
-  tg('🧠 <b>Daily AI Coach</b> — analysing your data...');
+  tg('☀️ <b>Good morning, brother!</b> Preparing your daily briefing...');
   try {
     const data = await readFirebaseData();
     if (!data) { tg('⚠️ No Firebase data yet. Save your planner data first.'); return; }
-    const report = await gptCoach(data);
-    tg(`🧠 <b>Daily AI Coach — ${new Date(Date.now()+5*3600*1000).toISOString().split('T')[0]}</b>\n\n${report}`);
-  } catch(e) { tg(`❌ Coach error: ${e.message}`); }
+
+    const today     = getTashkentDate();
+    const yDate     = new Date(Date.now() + 5*3600*1000 - 86400*1000);
+    const yesterday = yDate.toISOString().split('T')[0];
+    const yesterTasks = data.tasks[yesterday] || {};
+    const yDone = Object.values(yesterTasks).filter(Boolean).length;
+    const yTotal = Object.keys(yesterTasks).length;
+    const pYest = data.prayer[yesterday] || {};
+    const pNames = ['fajr','zuhr','asr','maghrib','isha'];
+    const pMissed = pNames.filter(p => !(pYest[p]?.done)).join(', ');
+
+    const prompt = `You are a tough loving coach for Azizbek (25yo, Tashkent).
+Goals: 90kg body, Quran memorisation, YouTube FK launch Jun 2026, law school entrance Sep 2026, brokerage skills.
+
+Yesterday ${yesterday}: ${yDone}/${yTotal||'?'} tasks done. Prayers missed: ${pMissed || 'none'}.
+
+Write a morning briefing. Max 180 words. Format:
+Line 1: Punchy personalised greeting
+[blank line]
+📊 Yesterday: honest 1-sentence assessment
+🎯 Top 3 Today: 3 specific priorities (numbered)
+⚠️ Watch out: 1 risk/weakness to guard against today
+💬 Closing: 1 powerful line referencing his specific goals
+END`;
+
+    const resp = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [{ role:'user', content: prompt }],
+      max_tokens: 300,
+    });
+    tg(resp.choices[0].message.content);
+  } catch(e) { tg(`❌ Morning briefing error: ${e.message}`); }
 }, { timezone: 'Asia/Tashkent' });
 
 // Weekly Report — Sunday 19:30 Tashkent
@@ -588,29 +617,117 @@ cron.schedule('30 19 * * 0', async () => {
   } catch(e) { tg(`❌ Report error: ${e.message}`); }
 }, { timezone: 'Asia/Tashkent' });
 
-// Daily schedule reminders
-const schedule = [
-  { time: '30 0  * * *', msg: '🌙 Work starts in 30 min! Prepare yourself.' },
-  { time: '5  9  * * *', msg: '✅ Work done! Morning routine: Quran → Gym cardio → Russian class → Finance video' },
-  { time: '15 9  * * *', msg: '📖 Quran time — 20 minutes. Don\'t skip it!' },
-  { time: '0  10 * * *', msg: '💪 Gym — Cardio session now! 1 hour fat loss' },
-  { time: '30 10 * * *', msg: '🇷🇺 Russian class time!' },
-  { time: '30 12 * * *', msg: '📺 Finance video time — watch today\'s UTAX video' },
-  { time: '0  13 * * *', msg: '🍽️ BREAKFAST — eat clean, no bread no sugar!' },
-  { time: '30 16 * * *', msg: '💪 Gym — Weight training session now!' },
-  { time: '0  18 * * 1-6', msg: '🍽️ LUNCH — clean meal, no bread no sugar!' },
-  { time: '30 18 * * *', msg: '📚 Business study: Uzum marketplace or China imports' },
-  { time: '0  20 * * *', msg: '🕌 Maghrib prayer time!' },
-  { time: '0  21 * * *', msg: '🍽️ DINNER — last meal, keep it clean!' },
-  { time: '30 21 * * *', msg: '💾 Save your life plan progress before sleep!' },
-  { time: '0  22 * * *', msg: '🕌 Isha prayer time!' },
-  { time: '30 23 * * *', msg: '😴 Sleep now — wake up at 00:30 for work!' },
-  { time: '0  18 * * 0', msg: '📊 Weekly reflection time! Rate your week 1–10:\n• Discipline\n• Deen\n• Health\n• Business\n• Mindset' },
-  { time: '0  19 * * 0', msg: '📅 Plan next week — open your life plan and set goals' },
-];
-schedule.forEach(({ time, msg }) => {
-  cron.schedule(time, () => remind(msg), { timezone: 'Asia/Tashkent' });
-});
+// ── Smart notification helpers ────────────────────────────────────────────────
+// Get today's date key in Tashkent (UTC+5)
+function getTashkentDate() {
+  const d = new Date(Date.now() + 5*3600*1000);
+  return d.toISOString().split('T')[0];
+}
+
+// Check Firebase: if task NOT done → send reminder, re-check in `reCheckMins`
+async function smartRemind(taskId, msg, reCheckMins = 0) {
+  const today = getTashkentDate();
+  let tasks = null;
+  try {
+    const data = await readFirebaseData();
+    tasks = data?.tasks?.[today] || null;
+  } catch(e) { /* Firebase unavailable — send anyway */ }
+
+  if (!tasks || !tasks[taskId]) {
+    // Task not done — send reminder
+    tg(msg);
+    // Optionally re-check later if still not done
+    if (reCheckMins > 0) {
+      setTimeout(async () => {
+        try {
+          const fresh = await readFirebaseData();
+          const freshTasks = fresh?.tasks?.[today] || {};
+          if (!freshTasks[taskId]) {
+            tg(`⏰ Brother, still pending:\n${msg.split('\n')[0]}\n\n<i>Open the planner and mark it done!</i>`);
+          }
+        } catch(e) {}
+      }, reCheckMins * 60 * 1000);
+    }
+  }
+  // If done — silent ✅
+}
+
+// Food reminder: send prompt + wait for reply  (logged when user confirms)
+const pendingFoodCheck = new Map(); // msgId → meal
+async function foodRemind(meal, taskId) {
+  const today = getTashkentDate();
+  let tasks = null;
+  try { const d = await readFirebaseData(); tasks = d?.tasks?.[today] || {}; } catch(e) {}
+  if (tasks && tasks[taskId]) return; // already logged
+
+  const sent = await tg(`🍽️ <b>${meal} time!</b>\n\nEat clean — no bread, no sugar, no processed food.\n\nReply with what you ate (e.g. "eggs + oats + tea") to log it 📝`);
+  if (sent?.message_id) pendingFoodCheck.set(sent.message_id, meal);
+
+  // Re-remind if no reply in 45 min
+  setTimeout(async () => {
+    try {
+      const fresh = await readFirebaseData();
+      const ft = fresh?.tasks?.[today] || {};
+      if (!ft[taskId]) tg(`⚠️ <b>${meal} not logged yet</b>\n\nBrother, please eat and reply with what you had!`);
+    } catch(e) {}
+  }, 45 * 60 * 1000);
+}
+
+// ── Smart Cron Schedule ───────────────────────────────────────────────────────
+// Work prep — no check needed (just wake-up call)
+cron.schedule('30 0 * * *', () => tg('🌙 <b>Work starts in 30 min!</b>\nGet ready brother. Bismillah.'), { timezone: 'Asia/Tashkent' });
+
+// After work — check Quran + gym
+cron.schedule('5 9 * * *', () => smartRemind('wk', '✅ Work shift done! Now:\n📖 Quran → 💪 Gym cardio → 📚 Brokerage study\n\nOpen planner: https://azizboyplan.netlify.app'), { timezone: 'Asia/Tashkent' });
+
+// Quran check — 09:15
+cron.schedule('15 9 * * *', () => smartRemind('q',  '📖 <b>Quran time</b> — 20 minutes memorisation now!\nDon\'t delay it, brother.', 40), { timezone: 'Asia/Tashkent' });
+
+// Gym cardio — 09:30
+cron.schedule('30 9 * * *', () => smartRemind('g1', '💪 <b>Gym Cardio now!</b>\n1 hour fat loss session. You\'re going from 105→90kg!\nEvery session counts.', 45), { timezone: 'Asia/Tashkent' });
+
+// Brokerage study — 11:00
+cron.schedule('0 11 * * *', () => smartRemind('br', '📊 <b>Brokerage/Tender study time!</b>\n1 hour deep focus — no phone, no distractions.', 50), { timezone: 'Asia/Tashkent' });
+
+// Breakfast — 13:00
+cron.schedule('0 13 * * *', () => foodRemind('Breakfast', 'br'), { timezone: 'Asia/Tashkent' });
+
+// Gym weights — 16:30
+cron.schedule('30 16 * * *', () => smartRemind('g2', '💪 <b>Weight Training now!</b>\n1.5 hour session. Build that body brother!', 50), { timezone: 'Asia/Tashkent' });
+
+// Lunch — 18:00 (weekdays)
+cron.schedule('0 18 * * 1-6', () => foodRemind('Lunch', 'g2'), { timezone: 'Asia/Tashkent' });
+
+// Maghrib prayer — 20:00
+cron.schedule('0 20 * * *', () => smartRemind('pr', '🕌 <b>Maghrib prayer time!</b>\nDon\'t miss it brother. Pray then rest.', 20), { timezone: 'Asia/Tashkent' });
+
+// Dinner — 21:00
+cron.schedule('0 21 * * *', () => foodRemind('Dinner', 'pr'), { timezone: 'Asia/Tashkent' });
+
+// Isha prayer — 22:00
+cron.schedule('0 22 * * *', () => smartRemind('pr2', '🕌 <b>Isha prayer time!</b>\nLast prayer of the day. Make it count.', 25), { timezone: 'Asia/Tashkent' });
+
+// Auto-save check — 22:00 (check if saved today)
+cron.schedule('0 22 * * *', async () => {
+  try {
+    const data = await readFirebaseData();
+    if (!data) return;
+    const savedAt = data.savedAt ? new Date(data.savedAt) : null;
+    const todayStr = getTashkentDate();
+    const savedToday = savedAt && savedAt.toISOString().split('T')[0] === todayStr;
+    if (!savedToday) {
+      tg('💾 <b>Reminder: Save your progress!</b>\nYour planner hasn\'t been saved today.\n\n<a href="https://azizboyplan.netlify.app">Open planner → tap 💾 Save Progress</a>');
+    }
+  } catch(e) {}
+}, { timezone: 'Asia/Tashkent' });
+
+// Plan tomorrow / sleep
+cron.schedule('30 21 * * *', () => smartRemind('pl', '📋 <b>Plan tomorrow</b> now before sleep!\nOpen planner → Daily → write tomorrow\'s focus.', 30), { timezone: 'Asia/Tashkent' });
+cron.schedule('30 23 * * *', () => tg('😴 <b>Sleep time!</b>\nWork starts at 01:00. Rest well, brother.'), { timezone: 'Asia/Tashkent' });
+
+// Sunday weekly reflection
+cron.schedule('0 18 * * 0', () => tg('📊 <b>Weekly Reflection</b>\nOpen planner → Reflection tab. Rate your week:\n• Discipline • Deen • Health • Business • Mindset\n\nOr use /report for AI analysis.'), { timezone: 'Asia/Tashkent' });
+cron.schedule('0 19 * * 0', () => tg('📅 <b>Plan next week!</b>\nOpen your planner and set weekly goals.'), { timezone: 'Asia/Tashkent' });
 
 // ── Telegram commands ─────────────────────────────────────────────────────────
 bot.onText(/\/start/, () => {
@@ -620,15 +737,16 @@ bot.onText(/\/start/, () => {
 🧠 <b>AI Coach</b> every morning at 09:05
 
 <b>Commands:</b>
-/coach — AI analysis of your data right now
-/russian — Start Russian practice session
-/finance — Financial analysis + money leak report
-/report — Generate this week's full report
-/predict — Goal deadline predictions with real math
-/pdf — Qonun moddalarini tahlil qilib PDF yaratish
-/schedule — Today's full schedule
-/motive — Motivational quote
-/prayers — Tashkent prayer times
+/today — ☀️ Morning briefing (personalised AI priorities for today)
+/coach — 🧠 AI analysis of your full data
+/finance — 💰 Financial analysis + money leaks
+/report — 📊 Weekly AI report
+/predict — 📈 Goal deadline predictions
+/russian — 🇷🇺 Russian practice session
+/pdf — 📄 Analyse law article (Word → PDF)
+/schedule — 📅 Today's full schedule
+/motive — 💎 Motivational quote
+/prayers — 🕌 Tashkent prayer times
 /status — Bot status
 /chatid — Your chat ID`);
 });
@@ -653,6 +771,71 @@ bot.onText(/\/coach/, async () => {
     if (!data) { tg('⚠️ No Firebase data. Make sure FIREBASE_SERVICE_ACCOUNT is set and you\'ve saved your planner.'); return; }
     const report = await gptCoach(data);
     tg(`🧠 <b>AI Coach</b>\n\n${report}`);
+  } catch(e) { tg(`❌ Error: ${e.message}`); }
+});
+
+// /today — AI morning briefing: reads yesterday's data, gives personalised today priorities
+bot.onText(/\/today/, async () => {
+  tg('☀️ Preparing your personal morning briefing...');
+  try {
+    const data = await readFirebaseData();
+    if (!data) { tg('⚠️ No Firebase data yet. Save your planner first.'); return; }
+
+    const today   = getTashkentDate();
+    const yDate   = new Date(Date.now() + 5*3600*1000 - 86400*1000);
+    const yesterday = yDate.toISOString().split('T')[0];
+    const todayTasks  = data.tasks[today]   || {};
+    const yesterTasks = data.tasks[yesterday] || {};
+
+    // Count yesterday's completion
+    const yKeys  = Object.keys(yesterTasks);
+    const yDone  = yKeys.filter(k => yesterTasks[k]).length;
+
+    // Find which critical tasks are not yet done today (tasks that should have been done by now)
+    const tashHour = new Date(Date.now() + 5*3600*1000).getHours();
+    const tasksDue = [
+      { id:'q',  time:9,  name:'Quran memorisation' },
+      { id:'g1', time:10, name:'Gym cardio' },
+      { id:'br', time:11, name:'Brokerage study' },
+      { id:'g2', time:17, name:'Gym weights' },
+      { id:'pl', time:22, name:'Plan tomorrow' },
+    ];
+    const overdueToday = tasksDue
+      .filter(t => tashHour > t.time && !todayTasks[t.id])
+      .map(t => `• ❌ ${t.name} — overdue`)
+      .join('\n');
+
+    // Prayer stats yesterday
+    const pYest = data.prayer[yesterday] || {};
+    const pNames = ['fajr','zuhr','asr','maghrib','isha'];
+    const pMissed = pNames.filter(p => !(pYest[p]?.done)).map(p=>p).join(', ');
+
+    const prompt = `You are a tough but caring life coach for Azizbek (25yo, Tashkent, Uzbekistan).
+His goals: reach 90kg body weight, memorise Quran surahs, launch YouTube FK series (Civil Code), pass law school entrance, grow brokerage skills.
+
+Yesterday (${yesterday}):
+- Tasks completed: ${yDone} / ${yKeys.length || 'unknown'}
+- Prayers missed yesterday: ${pMissed || 'none'}
+
+Today (${today}), currently ${tashHour}:00 Tashkent time:
+${overdueToday || '- No overdue tasks yet'}
+
+Write a PERSONAL morning briefing for TODAY. Format exactly like this (in English, max 200 words):
+Line 1: Short powerful greeting with his name
+Line 2: blank
+Section "📊 Yesterday": 1-2 sentences about yesterday's performance (honest, no sugarcoating)
+Section "🎯 Top 3 Today": exactly 3 specific priorities for today (reference real tasks above)
+Section "⚠️ Watch out": 1 thing he's at risk of slipping on today
+Section "💬 One line": one motivational sentence specific to his goals
+END`;
+
+    const resp = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [{ role:'user', content: prompt }],
+      max_tokens: 350,
+    });
+    const briefing = resp.choices[0].message.content;
+    tg(`☀️ <b>Good morning, brother!</b>\n\n${briefing}`);
   } catch(e) { tg(`❌ Error: ${e.message}`); }
 });
 
@@ -741,6 +924,29 @@ bot.onText(/\/prayers/, () => {
 bot.on('message', async (msg) => {
   if (!msg.text || msg.text.startsWith('/')) return;
   if (String(msg.chat.id) !== String(CHAT_ID)) return;
+
+  // ── Food logging: reply to food reminder ─────────────────────────────────
+  if (msg.reply_to_message && pendingFoodCheck.has(msg.reply_to_message.message_id)) {
+    const meal = pendingFoodCheck.get(msg.reply_to_message.message_id);
+    pendingFoodCheck.delete(msg.reply_to_message.message_id);
+    const today = getTashkentDate();
+    const food  = msg.text.trim();
+    try {
+      // Write food log to Firebase diet field
+      const data = await readFirebaseData();
+      const diet = data?.diet || {};
+      if (!diet[today]) diet[today] = { foods:[], score:0 };
+      if (!diet[today].foods) diet[today].foods = [];
+      diet[today].foods.push(`${meal}: ${food}`);
+      await firestoreDb.collection('lifeplanner').doc('azizbek2026').update({
+        diet: JSON.stringify(diet)
+      });
+      tg(`✅ <b>${meal} logged!</b>\n🍽️ "${food}"\n\nKeep eating clean, brother! 💪`);
+    } catch(e) {
+      tg(`✅ <b>${meal} noted:</b> "${food}"\n<i>(Firebase save failed — log manually in planner)</i>`);
+    }
+    return;
+  }
 
   // ── PDF session ──────────────────────────────────────────────────────────
   if (pdfSessions.has(CHAT_ID)) {

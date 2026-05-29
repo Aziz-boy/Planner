@@ -795,6 +795,7 @@ hr{ border-color: rgba(201,168,76,0.07); }
   <div class="ntab" onclick="showSec('workout',this)"><span class="nav-icon"><i class="fa-solid fa-dumbbell"></i></span> Workout</div>
   <div class="ntab" onclick="showSec('reflect',this)"><span class="nav-icon"><i class="fa-solid fa-brain"></i></span> Reflection</div>
   <div class="ntab" onclick="showSec('youtube',this)"><span class="nav-icon"><i class="fa-brands fa-youtube"></i></span> YouTube</div>
+  <div class="ntab" onclick="showSec('roadmap',this)"><span class="nav-icon"><i class="fa-solid fa-map"></i></span> Roadmap</div>
 </div>
 
 <!-- YOUTUBE -->
@@ -1323,6 +1324,13 @@ hr{ border-color: rgba(201,168,76,0.07); }
   </div>
 </div>
 
+<!-- ROADMAP -->
+<div class="sec" id="sec-roadmap">
+  <div class="sec-title"><span class="sec-icon"><i class="fa-solid fa-map"></i></span> 10-Year Life Roadmap</div>
+  <div class="sec-sub">Your full journey 2026 → 2035. Tap any milestone to mark it complete — it lights up gold.</div>
+  <div id="roadmapTimeline" style="margin-top:8px;"></div>
+</div>
+
 <!-- VISION -->
 <!-- AI PLAN SECTION -->
 <div class="sec" id="sec-aiplan">
@@ -1445,8 +1453,9 @@ window.saveAllData = async function() {
       workout: JSON.stringify(window._workoutState||{}),
       reflect: JSON.stringify(window._reflectState||{}),
       youtube: JSON.stringify(window._ytState     ||{}),
-      weight:  JSON.stringify(window._weightState ||{}),
-      aiPlan:  window._aiPlanState ? JSON.stringify(window._aiPlanState) : null,
+      weight:   JSON.stringify(window._weightState   ||{}),
+      aiPlan:   window._aiPlanState ? JSON.stringify(window._aiPlanState) : null,
+      roadmap:  JSON.stringify(window._roadmapState ||{}),
       savedAt: new Date().toISOString(),
     };
     await setDoc(USER_DOC_REF, payload);
@@ -1485,8 +1494,9 @@ function _applySnapshot(snap) {
   window._workoutState = JSON.parse(d.workout ||'{}');
   window._reflectState = JSON.parse(d.reflect ||'{}');
   window._ytState      = JSON.parse(d.youtube ||'{}');
-  window._weightState  = d.weight ? JSON.parse(d.weight) : {};
-  window._aiPlanState  = d.aiPlan ? JSON.parse(d.aiPlan) : null;
+  window._weightState   = d.weight  ? JSON.parse(d.weight)  : {};
+  window._aiPlanState   = d.aiPlan  ? JSON.parse(d.aiPlan)  : null;
+  window._roadmapState  = d.roadmap ? JSON.parse(d.roadmap) : {};
 
   const dot=document.getElementById('saveDot');
   const lbl=document.getElementById('saveLabel');
@@ -1581,8 +1591,9 @@ function scheduleSave() {
   window._reflectState = reflectState;
   window._ytState      = ytState;
   // weight + aiPlan synced here too
-  if (typeof weightState  !== 'undefined') window._weightState  = weightState;
-  if (typeof aiPlanState  !== 'undefined') window._aiPlanState  = aiPlanState;
+  if (typeof weightState   !== 'undefined') window._weightState   = weightState;
+  if (typeof aiPlanState   !== 'undefined') window._aiPlanState   = aiPlanState;
+  if (typeof roadmapState  !== 'undefined') window._roadmapState  = roadmapState;
   setSaveStatus('saving', 'Unsaved — click Save!');
 }
 
@@ -1910,19 +1921,22 @@ function catStatsRange(fromDate, toDate, catFilter, countAll) {
   return {done, total:eff, pct: eff ? Math.round(done/eff*100) : 0};
 }
 
-// Overall: checked pts / ALL pts in Jun-Dec plan
+// Overall: done / elapsed tasks (what % of what you SHOULD have done by now did you actually do)
 function overallStats() {
-  let done=0, total=0;
+  const today = new Date();
+  let done=0, elapsedTotal=0, allTotal=0;
   let d=new Date(START);
   while(d<=END){
     const key=dateKey(d);
     getTasksForDate(d).forEach(t=>{
-      total+=t.pts;
-      if(getTask(key,t.id)) done+=t.pts;
+      allTotal += t.pts||1;
+      if(d <= today) elapsedTotal += t.pts||1;
+      if(getTask(key,t.id)) done += t.pts||1;
     });
     d=addDays(d,1);
   }
-  return {done, total, pct: total?Math.round(done/total*100):0};
+  // % vs elapsed total (meaningful); also return allTotal for context
+  return {done, total:elapsedTotal, allTotal, pct: elapsedTotal ? Math.round(done/elapsedTotal*100) : 0};
 }
 
 // ═══════════════════════════════════════════
@@ -2095,43 +2109,67 @@ function renderMonthly() {
   const mEnd     = new Date(2026, curMonth,   0); // last day of month
   const planStart= new Date(Math.max(mStart,  START));
   const planEnd  = new Date(Math.min(mEnd,    END));
+  const today    = new Date();
 
-  // Total days in this plan-month
+  // Month state: past / current / future
+  const isFuture  = today < planStart;
+  const isPast    = today > planEnd;
+  // For progress calculation: only count elapsed days (up to today) as denominator
+  const elapsedEnd = isFuture ? new Date(planStart) : (isPast ? planEnd : today);
+
+  // Total plan days in month
   let totalDays=0, d=new Date(planStart);
   while(d<=planEnd){ totalDays++; d=addDays(d,1); }
 
-  // Count days where at least 1 task is checked (= "active" days)
+  // Active days (at least 1 task checked)
   let activeDays=0;
   d=new Date(planStart);
   while(d<=planEnd){
     const key=dateKey(d);
-    const tasks=getTasksForDate(d);
-    if(tasks.some(t=>getTask(key,t.id))) activeDays++;
+    if(getTasksForDate(d).some(t=>getTask(key,t.id))) activeDays++;
     d=addDays(d,1);
   }
 
-  // Points: total = all tasks in month, done = checked tasks (any date)
-  const allStats = catStatsRange(planStart, planEnd, null, true);
-  const monthPct = allStats.pct;
+  // Points: for current/past use elapsed total; for future show plan total
+  const allStats = catStatsRange(planStart, isFuture ? planEnd : elapsedEnd, null, false);
+  // If future month, total=all tasks in month (target), done=0
+  const displayTotal = isFuture
+    ? (() => { let t=0; let dd=new Date(planStart); while(dd<=planEnd){ getTasksForDate(dd).forEach(tk=>t+=tk.pts||1); dd=addDays(dd,1); } return t; })()
+    : allStats.total;
+  const monthPct = isFuture ? 0 : allStats.pct;
 
-  // Per-category stats — countAll=true so future checks still count
+  // Per-category stats
   const cats=['quran','gym','russian','finance','content','business','study','plan'];
   const catStats={};
-  cats.forEach(c=>{ catStats[c]=catStatsRange(planStart,planEnd,c,true); });
+  cats.forEach(c=>{
+    if(isFuture){
+      // Show planned total, 0 done
+      let t=0; let dd=new Date(planStart);
+      while(dd<=planEnd){ getTasksForDate(dd).filter(tk=>tk.cat===c).forEach(tk=>t+=tk.pts||1); dd=addDays(dd,1); }
+      catStats[c]={done:0, total:t, pct:0};
+    } else {
+      catStats[c]=catStatsRange(planStart, elapsedEnd, c, false);
+    }
+  });
 
-  // Summary boxes
+  const futureNote = isFuture
+    ? `<div style="background:rgba(201,168,76,0.06);border:1px solid rgba(201,168,76,0.15);border-radius:8px;padding:8px 12px;font-size:0.72rem;color:var(--muted);margin-bottom:12px;">
+        ⏳ ${MONTHS_FULL[curMonth]} starts in <b style="color:var(--gold);">${Math.ceil((planStart-today)/(86400000))} days</b> — showing planned targets
+       </div>` : '';
+
   document.getElementById('moSummary').innerHTML=`
+    ${futureNote}
     <div class="mo-sum-item">
-      <div class="mo-sum-val">${monthPct}%</div>
-      <div class="mo-sum-lbl">Month Tasks Done</div>
+      <div class="mo-sum-val" style="${isFuture?'color:var(--muted)':''}">${isFuture?'—':monthPct+'%'}</div>
+      <div class="mo-sum-lbl">${isFuture?'Not started':'Tasks Done'}</div>
     </div>
     <div class="mo-sum-item">
       <div class="mo-sum-val">${activeDays}</div>
-      <div class="mo-sum-lbl">Active Days / ${totalDays}</div>
+      <div class="mo-sum-lbl">Active / ${totalDays} days</div>
     </div>
     <div class="mo-sum-item">
-      <div class="mo-sum-val">${allStats.done}</div>
-      <div class="mo-sum-lbl">Pts Earned / ${allStats.total}</div>
+      <div class="mo-sum-val">${isFuture?'—':allStats.done}</div>
+      <div class="mo-sum-lbl">Pts Earned / ${displayTotal}</div>
     </div>
   `;
 
@@ -2144,8 +2182,11 @@ function renderMonthly() {
         <div class="mo-name">${g.text}</div>
         <div class="mo-cat">${g.cat}</div>
       </div>
-      <div class="mo-bar"><div class="mo-fill" style="width:${cs.pct}%;background:${g.color}"></div></div>
-      <div class="mo-sub">${cs.pct}% · ${cs.done}/${cs.total} pts in <b>${g.cat}</b> tasks this month</div>
+      <div class="mo-bar">
+        ${isFuture?`<div style="width:100%;height:100%;background:${g.color}18;border-radius:4px;"></div>`
+                  :`<div class="mo-fill" style="width:${cs.pct}%;background:${g.color}"></div>`}
+      </div>
+      <div class="mo-sub">${isFuture ? `${cs.total} pts planned this month` : `${cs.pct}% · ${cs.done}/${cs.total} pts`}</div>
     </div>`;
   }).join('');
 }
@@ -3434,7 +3475,7 @@ function getYtStatus(epId){ return ytState[epId]||'none'; }
 
 function getCurrentEpisode(){
   const today = new Date();
-  // Find the episode whose date is closest past Saturday
+  if (today < YT_EPISODES[0].date) return { ...YT_EPISODES[0], prelaunch: true }; // series not started
   let cur = YT_EPISODES[0];
   for(const ep of YT_EPISODES){
     if(ep.date <= today) cur = ep;
@@ -3469,8 +3510,16 @@ function renderYoutube(){
   const statusColors={none:'#444',planned:'#C9A84C',filmed:'#4A90D9',uploaded:'#4CAF7D'};
   const statusLabels={none:'Not started',planned:'📝 Planned',filmed:'🎥 Filmed',uploaded:'🚀 Uploaded'};
   const nextEp = YT_EPISODES[curEp.ep] || null; // ep is 1-indexed, array is 0-indexed
+  const daysToLaunch = curEp.prelaunch ? Math.ceil((YT_EPISODES[0].date - new Date()) / 86400000) : 0;
 
-  document.getElementById('ytThisWeek').innerHTML=`
+  document.getElementById('ytThisWeek').innerHTML= curEp.prelaunch ? `
+    <div style="text-align:center;padding:20px 0;">
+      <div style="font-size:2rem;margin-bottom:6px;">🎬</div>
+      <div style="font-family:'Playfair Display',serif;font-size:1.6rem;color:#FF6080;font-weight:700;">${daysToLaunch} days</div>
+      <div style="font-size:0.78rem;color:var(--muted);margin-top:4px;">until your YouTube series launches</div>
+      <div style="font-size:0.72rem;color:var(--gold);margin-top:8px;">📅 First episode: ${YT_EPISODES[0].date.getDate()} Jun 2026 · EP1: ${YT_EPISODES[0].title}</div>
+      <div style="margin-top:14px;font-size:0.7rem;color:var(--muted);">Use this time to prepare EP1 content — film, edit, plan first 4 episodes</div>
+    </div>` : `
     <div style="display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center;padding:12px 0;">
       <div style="font-family:'Playfair Display',serif;font-size:2.5rem;color:#FF608033;font-weight:900;">
         EP${curEp.ep}
@@ -3534,6 +3583,7 @@ function showSec(id,tab){
   else if(id==='tracker') { setTimeout(renderWeightChart, 50); }
   else if(id==='youtube') renderYoutube();
   else if(id==='aiplan')  { if(typeof renderAIPlan==='function' && aiPlanState) renderAIPlan(); }
+  else if(id==='roadmap') { if(typeof renderRoadmap==='function') renderRoadmap(); }
   else if(id==='tracker')   { renderTracker(); renderStreakWall(); }
   else renderAll();
 }
@@ -3808,47 +3858,53 @@ function renderMonthCompare() {
   const months = [5,6,7,8,9,10,11,12];
   const labels = ['May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const now = new Date();
+  const colors = ['#8B6914','#C9A84C','#E07A30','#4CAF7D','#4A90D9','#B464C8','#40C0D0','#FF6080'];
+
+  // For each month: {pct, isFuture, isCurrent}
   const data = months.map(m => {
     const mStart = new Date(2026, m-1, 1);
     const mEnd   = new Date(2026, m, 0);
-    if (mStart > now) return null;
-    const from = new Date(Math.max(mStart, START));
-    const to   = new Date(Math.min(mEnd, now));
-    let done=0, total=0, d=new Date(from);
-    while (d <= to) {
-      const key = dateKey(d);
-      const tasks = getTasksForDate(d);
-      const st = state[key] || {};
-      total += tasks.length;
-      done  += tasks.filter(t => st[t.id]).length;
-      d = addDays(d,1);
+    const from   = new Date(Math.max(mStart, START));
+    const isFuture  = mStart > now;
+    const isCurrent = !isFuture && mEnd >= now;
+    const to = isFuture ? mEnd : new Date(Math.min(mEnd, now));
+    let done=0, total=0;
+    if (!isFuture) {
+      let d=new Date(from);
+      while (d <= to) {
+        const key=dateKey(d), tasks=getTasksForDate(d), st=state[key]||{};
+        total += tasks.length;
+        done  += tasks.filter(t=>st[t.id]).length;
+        d = addDays(d,1);
+      }
     }
-    return total ? done/total : 0;
+    return { pct: total ? done/total : 0, isFuture, isCurrent };
   });
 
-  const active = data.filter(v => v !== null);
-  if (!active.length) {
-    ctx.fillStyle='#555'; ctx.font='11px DM Sans,sans-serif';
-    ctx.textAlign='center'; ctx.fillText('No data yet', W/2, H/2); return;
-  }
-
+  const maxV = Math.max(...data.map(d=>d.isFuture?0:d.pct), 0.01);
   const barW = (W - 20) / months.length;
-  const maxV  = Math.max(...active, 0.01);
-  data.forEach((v, i) => {
-    if (v === null) return;
-    const x = 10 + i * barW + barW*0.15;
+
+  data.forEach((d, i) => {
+    const x  = 10 + i * barW + barW*0.15;
     const bw = barW * 0.7;
-    const bh = (v / maxV) * (H - 28);
-    const colors = ['#8B6914','#C9A84C','#E07A30','#4CAF7D','#4A90D9','#B464C8','#40C0D0','#FF6080'];
-    ctx.fillStyle = colors[i] || '#C9A84C';
-    ctx.beginPath();
-    ctx.roundRect(x, H-22-bh, bw, bh, 3);
-    ctx.fill();
-    ctx.fillStyle = '#888'; ctx.font = '8px DM Sans,sans-serif';
-    ctx.textAlign = 'center';
+    const col = colors[i] || '#C9A84C';
+
+    if (d.isFuture) {
+      // Draw outline-only bar as "planned"
+      ctx.strokeStyle = col+'44'; ctx.lineWidth = 1;
+      const minH = 8;
+      ctx.beginPath(); ctx.roundRect(x, H-22-minH, bw, minH, 2); ctx.stroke();
+    } else {
+      const bh = Math.max(3, (d.pct / maxV) * (H - 28));
+      ctx.fillStyle = d.isCurrent ? col : col+'BB';
+      ctx.beginPath(); ctx.roundRect(x, H-22-bh, bw, bh, 3); ctx.fill();
+      ctx.fillStyle = d.isCurrent ? col : '#666';
+      ctx.font = `bold 8px DM Sans,sans-serif`; ctx.textAlign='center';
+      ctx.fillText(Math.round(d.pct*100)+'%', x+bw/2, H-24-bh);
+    }
+    ctx.fillStyle = d.isFuture ? '#333' : (d.isCurrent ? '#AAA' : '#666');
+    ctx.font = '8px DM Sans,sans-serif'; ctx.textAlign='center';
     ctx.fillText(labels[i], x + bw/2, H-8);
-    ctx.fillStyle = '#C9A84C'; ctx.font = 'bold 8px DM Sans,sans-serif';
-    ctx.fillText(Math.round(v*100)+'%', x+bw/2, H-24-bh);
   });
 }
 
@@ -3885,8 +3941,9 @@ const _origScheduleSave = scheduleSave;
 // _onFirebaseLoaded: runs on every Firestore snapshot (initial + remote updates)
 const _origLoaded = window._onFirebaseLoaded;
 window._onFirebaseLoaded = function() {
-  weightState  = window._weightState  || {};
-  aiPlanState  = window._aiPlanState  || null;
+  weightState   = window._weightState   || {};
+  aiPlanState   = window._aiPlanState   || null;
+  roadmapState  = window._roadmapState  || {};
   if (_origLoaded) _origLoaded();
   renderWeightChart();
   renderBestDay();
@@ -4090,6 +4147,105 @@ function renderAIPlan() {
 function toggleWeekDetail(startDate) {
   const el = document.getElementById('week-' + startDate);
   if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+// ═══════════════════════════════════════════
+// 10-YEAR ROADMAP
+// ═══════════════════════════════════════════
+const ROADMAP_DATA = [
+  { year: 2026, color: '#C9A84C', milestones: [
+    { id:'rm-2026-yt',    icon:'🎬', text:'YouTube FK series launched',   sub:'Jun 2026',  cat:'content'   },
+    { id:'rm-2026-law',   icon:'📚', text:'Law school started',           sub:'Sep 2026',  cat:'education' },
+    { id:'rm-2026-gym',   icon:'💪', text:'Reached 90 kg (from 105)',     sub:'Aug 2026',  cat:'health'    },
+    { id:'rm-2026-fin',   icon:'📈', text:'First brokerage trade placed', sub:'Q3 2026',   cat:'finance'   },
+    { id:'rm-2026-save',  icon:'💰', text:'10M so\'m saved',              sub:'Dec 2026',  cat:'finance'   },
+  ]},
+  { year: 2027, color: '#4A90D9', milestones: [
+    { id:'rm-2027-nik',   icon:'💍', text:'Nikah (InshaAllah)',           sub:'InshaAllah',cat:'life'      },
+    { id:'rm-2027-uzum',  icon:'🛒', text:'Uzum seller registered',      sub:'Q1 2027',   cat:'business'  },
+    { id:'rm-2027-law2',  icon:'⚖️', text:'2nd year law complete',        sub:'Jun 2027',  cat:'education' },
+    { id:'rm-2027-yt2',   icon:'🎥', text:'YouTube 5,000 subscribers',   sub:'2027',       cat:'content'   },
+  ]},
+  { year: 2028, color: '#4CAF7D', milestones: [
+    { id:'rm-2028-biz',   icon:'🏢', text:'Own business registered',     sub:'2028',       cat:'business'  },
+    { id:'rm-2028-law3',  icon:'📜', text:'Law degree complete',          sub:'Jun 2028',  cat:'education' },
+    { id:'rm-2028-hajj',  icon:'🕋', text:'Hajj (InshaAllah)',           sub:'2028',       cat:'deen'      },
+    { id:'rm-2028-car',   icon:'🚗', text:'Own car (no debt)',           sub:'2028',       cat:'finance'   },
+  ]},
+  { year: 2029, color: '#E07A30', milestones: [
+    { id:'rm-2029-china', icon:'🌏', text:'China import business live',  sub:'2029',       cat:'business'  },
+    { id:'rm-2029-yt3',   icon:'▶️', text:'YouTube 50,000 subscribers',  sub:'2029',       cat:'content'   },
+    { id:'rm-2029-prop',  icon:'🏠', text:'Property investment start',   sub:'2029',       cat:'finance'   },
+  ]},
+  { year: 2030, color: '#B464C8', milestones: [
+    { id:'rm-2030-mil',   icon:'💎', text:'1 million so\'m net worth',    sub:'2030',       cat:'finance'   },
+    { id:'rm-2030-masjid',icon:'🕌', text:'Masjid donation project',     sub:'2030',       cat:'deen'      },
+    { id:'rm-2030-biz2',  icon:'📊', text:'Business turns profitable',   sub:'2030',       cat:'business'  },
+  ]},
+  { year: 2031, color: '#40C0D0', milestones: [
+    { id:'rm-2031-inv',   icon:'📈', text:'Investment portfolio $50K',   sub:'2031',       cat:'finance'   },
+    { id:'rm-2031-team',  icon:'👥', text:'First employee hired',        sub:'2031',       cat:'business'  },
+  ]},
+  { year: 2032, color: '#FF6080', milestones: [
+    { id:'rm-2032-apt',   icon:'🏡', text:'First apartment purchased',   sub:'2032',       cat:'life'      },
+    { id:'rm-2032-yt4',   icon:'🎯', text:'YouTube 200K subscribers',   sub:'2032',       cat:'content'   },
+  ]},
+  { year: 2035, color: '#C9A84C', milestones: [
+    { id:'rm-2035-free',  icon:'🦅', text:'Financially free',            sub:'2035 goal',  cat:'finance'   },
+    { id:'rm-2035-law4',  icon:'⚖️', text:'Lawyer / law practice',       sub:'2035',       cat:'education' },
+    { id:'rm-2035-yt5',   icon:'🚀', text:'YouTube 1M subscribers',      sub:'2035',       cat:'content'   },
+    { id:'rm-2035-haj2',  icon:'🕋', text:'2nd Hajj with family',        sub:'2035',       cat:'deen'      },
+  ]},
+];
+
+let roadmapState = {}; // { 'rm-id': true }
+
+function toggleRoadmapMilestone(id) {
+  roadmapState[id] = !roadmapState[id];
+  window._roadmapState = roadmapState;
+  scheduleSave();
+  renderRoadmap();
+}
+
+function renderRoadmap() {
+  const el = document.getElementById('roadmapTimeline');
+  if (!el) return;
+
+  const doneCount = Object.values(roadmapState).filter(Boolean).length;
+  const totalCount = ROADMAP_DATA.reduce((s,y)=>s+y.milestones.length,0);
+
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding:10px 14px;background:rgba(201,168,76,0.06);border:1px solid rgba(201,168,76,0.15);border-radius:10px;">
+      <div style="font-size:0.75rem;color:var(--muted);flex:1;">Life milestones completed</div>
+      <div style="font-size:1rem;font-weight:700;color:var(--gold);">${doneCount} / ${totalCount}</div>
+    </div>
+    ${ROADMAP_DATA.map(yr => {
+      const done = yr.milestones.filter(m => roadmapState[m.id]).length;
+      const allDone = done === yr.milestones.length;
+      return `
+      <div style="margin-bottom:20px;">
+        <!-- Year header with line -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+          <div style="width:44px;height:44px;border-radius:50%;border:2px solid ${allDone?yr.color:yr.color+'44'};background:${allDone?yr.color+'22':'transparent'};display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:0.85rem;font-weight:700;color:${allDone?yr.color:yr.color+'88'};flex-shrink:0;">${yr.year}</div>
+          <div style="flex:1;height:1px;background:${allDone?yr.color+'55':yr.color+'18'};"></div>
+          <div style="font-size:0.65rem;color:${allDone?yr.color:'var(--muted)'};">${done}/${yr.milestones.length}</div>
+        </div>
+        <!-- Milestones -->
+        <div style="padding-left:22px;border-left:2px solid ${yr.color+'22'};">
+          ${yr.milestones.map(m => {
+            const isDone = !!roadmapState[m.id];
+            return `<div onclick="toggleRoadmapMilestone('${m.id}')" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;margin-bottom:5px;background:${isDone?yr.color+'12':'rgba(255,255,255,0.015)'};border:1px solid ${isDone?yr.color+'33':'rgba(255,255,255,0.05)'};cursor:pointer;transition:all .2s;">
+              <div style="font-size:1rem;flex-shrink:0;">${m.icon}</div>
+              <div style="flex:1;">
+                <div style="font-size:0.8rem;font-weight:${isDone?'600':'400'};color:${isDone?yr.color:'var(--text)'};${isDone?'':'opacity:0.85'}">${m.text}</div>
+                <div style="font-size:0.62rem;color:var(--muted);margin-top:1px;">${m.sub} · ${m.cat}</div>
+              </div>
+              <div style="width:20px;height:20px;border-radius:50%;border:2px solid ${isDone?yr.color:yr.color+'44'};background:${isDone?yr.color:'transparent'};display:flex;align-items:center;justify-content:center;font-size:0.6rem;color:${isDone?'#000':'transparent'};flex-shrink:0;transition:all .2s;">✓</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+    }).join('')}`;
 }
 
 // ═══════════════════════════════════════════
