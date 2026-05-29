@@ -8,6 +8,7 @@ const fs          = require('fs');
 const path        = require('path');
 const OpenAI      = require('openai');
 const admin       = require('firebase-admin');
+const PDFDocument = require('pdfkit');
 
 // ── Telegram ──────────────────────────────────────────────────────────────────
 const TOKEN   = process.env.TELEGRAM_BOT_TOKEN;
@@ -370,7 +371,146 @@ async function gptPredict(data) {
 }
 
 // ── Russian practice session state ────────────────────────────────────────────
-const russianSessions = new Map(); // chatId → [{ role, content }, ...]
+const russianSessions = new Map();
+
+// ── PDF Law Analyzer session state ───────────────────────────────────────────
+const pdfSessions = new Map(); // chatId → { title, chunks: [text] }
+
+function splitIntoArticles(text) {
+  // Split on "Modda N." or "Moddа N." or numbered lines like "1." at start
+  const lines = text.split('\n');
+  const articles = [];
+  let current = null;
+
+  for (const line of lines) {
+    const match = line.match(/^(Modda|MODDA|Моdda|Статья|Maqola)\s*(\d+)[.\-–]/i)
+                || line.match(/^(\d+)[.\-–]\s+[A-ZА-ЯҚҒҲЎa-z]/);
+    if (match) {
+      if (current) articles.push(current);
+      current = { header: line.trim(), body: '' };
+    } else if (current) {
+      current.body += (current.body ? '\n' : '') + line;
+    } else {
+      // Text before first article — treat as preamble
+      if (articles.length === 0 && line.trim()) {
+        if (!current) current = { header: 'Kirish / Preambula', body: '' };
+        current.body += line + '\n';
+      }
+    }
+  }
+  if (current) articles.push(current);
+  return articles;
+}
+
+async function analyzeArticle(header, body, docTitle) {
+  const resp = await openai.chat.completions.create({
+    model: 'gpt-4o',
+    messages: [{
+      role: 'system',
+      content: `Sen Azizbek uchun yuridik hujjatlarni tahlil qiluvchi yordamchisan. U Toshkentda huquq fakultetida o'qiydi va YouTube uchun video tushiradi.
+Har bir moddani quyidagi formatda tahlil qil (O'zbek tilida yoz):
+1. 📌 ASOSIY MA'NO — 1-2 jumlada sodda tilda
+2. 🔑 KALIT TUSHUNCHALAR — 3-5 ta muhim atama va ta'rifi
+3. ⚖️ AMALIY MISOL — real hayotdan 1 ta konkret misol
+4. ❓ VIDEO UCHUN SAVOL — tomoshabinlarga beriladigan 1 ta qiziqarli savol
+
+Qisqa, aniq, tushinarli yoz. Huquqiy jargondan qoching.`
+    }, {
+      role: 'user',
+      content: `Hujjat: ${docTitle}\n\n${header}\n${body}`
+    }],
+    max_tokens: 400,
+    temperature: 0.5,
+  });
+  return resp.choices[0].message.content;
+}
+
+async function generateLawPDF(title, articles, analyses) {
+  return new Promise((resolve, reject) => {
+    const filePath = path.join('/tmp', `law_${Date.now()}.pdf`);
+    const doc = new PDFDocument({
+      size: 'A4',
+      margins: { top: 60, bottom: 60, left: 60, right: 60 },
+      info: { Title: title, Author: 'Azizbek — Life Planner Bot' }
+    });
+
+    const stream = fs.createWriteStream(filePath);
+    doc.pipe(stream);
+
+    // ── Register fonts ────────────────────────────────────────
+    // PDFKit ships with Helvetica which supports Latin. For Uzbek Cyrillic
+    // we fall back gracefully — Helvetica covers most Uzbek Latin chars.
+    const FONT_BOLD   = 'Helvetica-Bold';
+    const FONT_NORMAL = 'Helvetica';
+
+    // ── Cover page ────────────────────────────────────────────
+    doc.rect(0, 0, doc.page.width, doc.page.height).fill('#0F0F14');
+    doc.fillColor('#C9A84C').font(FONT_BOLD).fontSize(28)
+       .text('⚖️', { align: 'center' });
+    doc.moveDown(0.5);
+    doc.fillColor('#C9A84C').font(FONT_BOLD).fontSize(22)
+       .text(title, { align: 'center' });
+    doc.moveDown(0.5);
+    doc.fillColor('#888888').font(FONT_NORMAL).fontSize(12)
+       .text(`AI Tahlil — ${articles.length} ta Modda`, { align: 'center' });
+    doc.moveDown(0.3);
+    doc.fillColor('#555555').font(FONT_NORMAL).fontSize(10)
+       .text(new Date().toLocaleDateString('uz-UZ'), { align: 'center' });
+    doc.moveDown(1);
+    doc.fillColor('#333333').font(FONT_NORMAL).fontSize(9)
+       .text('Azizbek uchun tayyorlangan — YouTube video uchun', { align: 'center' });
+
+    // ── Articles ──────────────────────────────────────────────
+    for (let i = 0; i < articles.length; i++) {
+      doc.addPage();
+      const art      = articles[i];
+      const analysis = analyses[i] || '';
+
+      // Article number banner
+      doc.rect(0, 0, doc.page.width, 8).fill('#C9A84C');
+
+      // Header
+      doc.fillColor('#C9A84C').font(FONT_BOLD).fontSize(15)
+         .text(art.header, 60, 30, { width: doc.page.width - 120 });
+
+      doc.moveDown(0.4);
+
+      // Original text box
+      if (art.body.trim()) {
+        doc.rect(60, doc.y, doc.page.width - 120, 1).fill('#333333');
+        doc.moveDown(0.3);
+        doc.fillColor('#AAAAAA').font(FONT_NORMAL).fontSize(9)
+           .text('ORIGINAL MATN:', { continued: false });
+        doc.fillColor('#CCCCCC').font(FONT_NORMAL).fontSize(9)
+           .text(art.body.trim().slice(0, 600) + (art.body.length > 600 ? '...' : ''),
+                 { width: doc.page.width - 120 });
+        doc.moveDown(0.6);
+      }
+
+      // Divider
+      doc.rect(60, doc.y, doc.page.width - 120, 1).fill('#C9A84C44');
+      doc.moveDown(0.5);
+
+      // AI analysis
+      doc.fillColor('#FFCC44').font(FONT_BOLD).fontSize(10)
+         .text('🤖 AI TAHLIL:', { continued: false });
+      doc.moveDown(0.2);
+      doc.fillColor('#EEEEEE').font(FONT_NORMAL).fontSize(10)
+         .text(analysis, { width: doc.page.width - 120, lineGap: 2 });
+
+      // Page footer
+      doc.fillColor('#444444').font(FONT_NORMAL).fontSize(8)
+         .text(`${i + 1} / ${articles.length} — ${title}`,
+               60, doc.page.height - 40,
+               { width: doc.page.width - 120, align: 'center' });
+    }
+
+    doc.end();
+    stream.on('finish', () => resolve(filePath));
+    stream.on('error', reject);
+  });
+}
+
 
 const RUSSIAN_SYSTEM = `You are a Russian language tutor for Azizbek — a Uzbek speaker who is learning Russian from scratch and takes daily classes. He works in logistics and studies law.
 Rules:
@@ -487,6 +627,7 @@ bot.onText(/\/start/, () => {
 /finance — Financial analysis + money leak report
 /report — Generate this week's full report
 /predict — Goal deadline predictions with real math
+/pdf — Qonun moddalarini tahlil qilib PDF yaratish
 /schedule — Today's full schedule
 /motive — Motivational quote
 /prayers — Tashkent prayer times
@@ -567,6 +708,20 @@ bot.onText(/\/stoprussian/, () => {
   tg('✅ Russian practice session ended. Молодец! (Well done!) 🇷🇺');
 });
 
+// PDF Law Analyzer
+bot.onText(/\/pdf/, () => {
+  pdfSessions.set(CHAT_ID, { stage: 'waiting_title' });
+  tg(`📄 <b>Qonunchilik Hujjati Tahlilchisi</b>
+
+Avval hujjat nomini yuboring.
+<i>Misol: Fuqarolik Kodeksi — 1–50 moddalar</i>`);
+});
+
+bot.onText(/\/stoppdf/, () => {
+  pdfSessions.delete(CHAT_ID);
+  tg('✅ PDF sessiyasi tugatildi.');
+});
+
 bot.onText(/\/chatid/, (msg) => tg(`Your chat ID: <code>${msg.chat.id}</code>`));
 bot.onText(/\/status/, () => {
   const now = new Date(Date.now() + 5 * 3600 * 1000);
@@ -584,11 +739,69 @@ bot.onText(/\/prayers/, () => {
 <i>Update monthly as times shift.</i>`);
 });
 
-// Handle all non-command messages — Russian practice if session active
+// Handle all non-command messages
 bot.on('message', async (msg) => {
   if (!msg.text || msg.text.startsWith('/')) return;
   if (String(msg.chat.id) !== String(CHAT_ID)) return;
 
+  // ── PDF session ──────────────────────────────────────────────────────────
+  if (pdfSessions.has(CHAT_ID)) {
+    const session = pdfSessions.get(CHAT_ID);
+
+    if (session.stage === 'waiting_title') {
+      session.title = msg.text.trim();
+      session.stage = 'waiting_text';
+      pdfSessions.set(CHAT_ID, session);
+      tg(`✅ Nom saqlandi: <b>${session.title}</b>
+
+Endi hujjat matnini yuboring.
+Barcha moddalar bo'lsa ham yuboring — men o'zim ajrataman.
+<i>Katta matn bo'lsa ham muammo yo'q.</i>`);
+      return;
+    }
+
+    if (session.stage === 'waiting_text') {
+      const rawText = msg.text.trim();
+      const articles = splitIntoArticles(rawText);
+
+      if (articles.length === 0) {
+        tg('⚠️ Moddalar topilmadi. Matn "Modda 1." yoki "1." formatida bo\'lishi kerak. Qayta yuboring.');
+        return;
+      }
+
+      tg(`📝 <b>${articles.length} ta modda topildi.</b>\nHar birini GPT-4o bilan tahlil qilyapman...\n⏳ Biroz kuting (${articles.length} × ~10 soniya)`);
+      pdfSessions.delete(CHAT_ID);
+
+      try {
+        const analyses = [];
+        for (let i = 0; i < articles.length; i++) {
+          const art = articles[i];
+          // Progress every 5 articles
+          if (i > 0 && i % 5 === 0) {
+            tg(`⏳ ${i}/${articles.length} tahlil qilindi...`);
+          }
+          const analysis = await analyzeArticle(art.header, art.body, session.title);
+          analyses.push(analysis);
+        }
+
+        tg('📄 PDF yaratilmoqda...');
+        const filePath = await generateLawPDF(session.title, articles, analyses);
+
+        await bot.sendDocument(CHAT_ID, filePath, {
+          caption: `✅ <b>${session.title}</b>\n${articles.length} ta modda tahlil qilindi.\n\n📺 YouTube video uchun tayyor!`,
+          parse_mode: 'HTML'
+        });
+
+        fs.unlink(filePath, () => {}); // cleanup
+      } catch(e) {
+        console.error('PDF error:', e);
+        tg(`❌ Xato: ${e.message}`);
+      }
+      return;
+    }
+  }
+
+  // ── Russian practice session ─────────────────────────────────────────────
   if (russianSessions.has(CHAT_ID)) {
     const history = russianSessions.get(CHAT_ID);
     history.push({ role: 'user', content: msg.text });
@@ -597,7 +810,7 @@ bot.on('message', async (msg) => {
         model: 'gpt-4o',
         messages: [
           { role: 'system', content: RUSSIAN_SYSTEM },
-          ...history.slice(-10) // keep last 10 turns
+          ...history.slice(-10)
         ],
         max_tokens: 200,
         temperature: 0.8,
