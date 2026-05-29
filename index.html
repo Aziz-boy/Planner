@@ -1439,7 +1439,7 @@ const CATS = {
   plan:    {color:'#888',    label:'Planning'},
 };
 
-const START = new Date('2026-06-01');
+const START = new Date('2026-05-30');
 const END   = new Date('2026-12-31');
 
 function getDayType(date) {
@@ -1737,7 +1737,7 @@ function overallStats() {
 // ═══════════════════════════════════════════
 let curDate = clamp(new Date());
 let wkOffset = 0;
-let curMonth = Math.max(6, Math.min(12, new Date().getMonth()+1));
+let curMonth = Math.max(5, Math.min(12, new Date().getMonth()+1));
 
 // ═══════════════════════════════════════════
 // RENDER
@@ -3333,7 +3333,7 @@ function changeDay(n){ curDate=clamp(addDays(curDate,n)); renderAll(); }
 function goToday(){ curDate=clamp(new Date()); renderAll(); }
 function changeWeek(n){ wkOffset+=n; renderAll(); }
 function goThisWeek(){ wkOffset=0; renderAll(); }
-function changeMo(n){ curMonth=Math.max(6,Math.min(12,curMonth+n)); renderAll(); }
+function changeMo(n){ curMonth=Math.max(5,Math.min(12,curMonth+n)); renderAll(); }
 
 // ═══════════════════════════════════════════
 // INIT
@@ -3352,6 +3352,91 @@ init();
 window.addEventListener('beforeunload', function(e){
   if(unsavedChanges){ e.preventDefault(); e.returnValue='You have unsaved changes. Save before leaving!'; }
 });
+</script>
+
+<!-- ── Browser Push Notifications (Life Planner Bot) ─────────────────── -->
+<script>
+(function(){
+  // Change this to your deployed bot server URL (Railway / Render)
+  const BOT_SERVER = 'https://your-bot-server.onrender.com';
+
+  const btn = document.createElement('button');
+  btn.id = 'notifBtn';
+  btn.style.cssText = [
+    'position:fixed;bottom:20px;right:20px;z-index:9999',
+    'background:linear-gradient(135deg,rgba(201,168,76,0.22),rgba(201,168,76,0.08))',
+    'border:1px solid rgba(201,168,76,0.45);color:#C9A84C',
+    'padding:9px 16px;border-radius:10px;cursor:pointer',
+    'font-family:"DM Sans",sans-serif;font-size:0.75rem;font-weight:600',
+    'box-shadow:0 4px 20px rgba(0,0,0,0.5),0 0 16px rgba(201,168,76,0.08)',
+    'transition:all .2s;backdrop-filter:blur(8px)'
+  ].join(';');
+  btn.textContent = '🔔 Enable Reminders';
+
+  function updateBtn(state) {
+    if (state === 'granted')  { btn.textContent = '✅ Reminders ON';  btn.style.borderColor = 'rgba(76,175,125,0.5)'; btn.style.color = '#4CAF7D'; }
+    if (state === 'denied')   { btn.textContent = '🔕 Blocked';        btn.style.opacity = '0.5'; btn.style.cursor = 'default'; }
+    if (state === 'default')  { btn.textContent = '🔔 Enable Reminders'; }
+  }
+
+  async function subscribe() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      alert('Your browser does not support push notifications.');
+      return;
+    }
+    try {
+      const perm = await Notification.requestPermission();
+      updateBtn(perm);
+      if (perm !== 'granted') return;
+
+      // Get VAPID public key from bot server
+      const keyRes = await fetch(BOT_SERVER + '/vapid-public-key').then(r => r.json());
+      if (!keyRes.key) { console.warn('No VAPID key — push disabled'); return; }
+
+      const reg = await navigator.serviceWorker.ready;
+      const existing = await reg.pushManager.getSubscription();
+      if (existing) { await existing.unsubscribe(); }
+
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(keyRes.key)
+      });
+
+      await fetch(BOT_SERVER + '/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sub)
+      });
+      console.log('Push subscription saved to bot server.');
+    } catch(e) {
+      console.error('Push setup failed:', e);
+    }
+  }
+
+  btn.addEventListener('click', subscribe);
+  document.body.appendChild(btn);
+
+  // Register service worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(e => console.warn('SW:', e));
+    navigator.serviceWorker.ready.then(async () => {
+      const perm = Notification.permission;
+      updateBtn(perm);
+      if (perm === 'granted') {
+        const reg = await navigator.serviceWorker.ready;
+        const sub = await reg.pushManager.getSubscription();
+        if (!sub) updateBtn('default'); // lost subscription, show button again
+      }
+    });
+  }
+
+  function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = atob(base64);
+    return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+  }
+})();
 </script>
 </body>
 </html>
