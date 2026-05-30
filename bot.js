@@ -1273,7 +1273,7 @@ RULES:
 - ONLY generate full week tasks for June, July, August (14 weeks total)
 - For Sep/Oct/Nov/Dec weeks array: leave empty [] — tasks are handled by app defaults
 - Task text should be SPECIFIC to the week theme, not generic
-- Quran surahs follow this schedule: Jun1=An-Nas(114), Jun8=Al-Falaq(113), Jun15=Al-Ikhlas(112), Jun22=Al-Masad(111), Jun29=An-Nasr(110), Jul6=Al-Kafirun(109), Jul13=Al-Kawthar(108), Jul20=Al-Ma'un(107), Jul27=Quraysh(106), Aug3=Al-Fil(105), Aug10=Al-Humazah(104), Aug17=Al-Asr(103), Aug24=At-Takathur(102), Aug31=Al-Qari'ah(101)
+- Quran surahs to memorise (An-Nas/Al-Falaq/Al-Ikhlas already known): Jun1=Al-Masad(111), Jun8=An-Nasr(110), Jun15=Al-Kafirun(109), Jun22=Al-Kawthar(108), Jun29=Al-Ma'un(107), Jul6=Quraysh(106), Jul13=Al-Fil(105), Jul20=Al-Humazah(104), Jul27=Al-Asr(103), Aug3=At-Takathur(102), Aug10=Al-Qari'ah(101), Aug17=Al-Adiyat(100), Aug24=Al-Zalzalah(99), Aug31=Al-Bayyinah(98)
 - Summer week dates: Jun1, Jun8, Jun15, Jun22, Jun29, Jul6, Jul13, Jul20, Jul27, Aug3, Aug10, Aug17, Aug24, Aug31
 - For YouTube: FK = Fuqarolik Kodeksi series, episodes 1-12 across summer Saturdays`
       }, {

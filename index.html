@@ -2000,8 +2000,14 @@ function renderDaily() {
   const _weekBanner = document.getElementById('aiWeekBanner');
   if (_weekBanner) {
     if (_aiWeek) {
+      // Always source the surah from SURAH_SCHEDULE (authoritative) — never trust AI plan cache
+      const _dk = dateKey(d);
+      const _sched = typeof SURAH_SCHEDULE !== 'undefined'
+        ? [...SURAH_SCHEDULE].reverse().find(s => _dk >= s.week)
+        : null;
+      const _surahLabel = _sched ? _sched.surah : _aiWeek.quranSurah;
       _weekBanner.style.display = 'block';
-      _weekBanner.innerHTML = `<span style="color:var(--gold);font-weight:700;">Week ${_aiWeek.num}:</span> ${_aiWeek.theme}${_aiWeek.quranSurah?' &nbsp;·&nbsp; 📖 '+_aiWeek.quranSurah:''}`;
+      _weekBanner.innerHTML = `<span style="color:var(--gold);font-weight:700;">Week ${_aiWeek.num}:</span> ${_aiWeek.theme}${_surahLabel?' &nbsp;·&nbsp; 📖 '+_surahLabel:''}`;
     } else {
       _weekBanner.style.display = 'none';
     }
@@ -4179,12 +4185,16 @@ function renderAIPlan() {
   document.getElementById('planQuarters').innerHTML = (aiPlanState.quarters||[]).map(q => {
     const qc = QCOLORS[q.id] || '#C9A84C';
     const months = (q.months||[]).map(m => {
-      const weeks = (m.weeks||[]).map(w => `
+      const weeks = (m.weeks||[]).map(w => {
+        // Always use SURAH_SCHEDULE as source of truth for the surah label
+        const _ws = w.startDate ? [...SURAH_SCHEDULE].reverse().find(s => w.startDate >= s.week) : null;
+        const _wSurah = (_ws && w.startDate < '2026-09-01') ? _ws.surah : (w.quranSurah || null);
+        return `
         <div style="padding:8px 12px;border-left:2px solid rgba(201,168,76,0.15);margin-left:12px;margin-bottom:4px;">
           <div style="display:flex;align-items:center;gap:8px;cursor:pointer;" onclick="toggleWeekDetail('${w.startDate}')">
             <div style="font-size:0.68rem;color:var(--gold);min-width:50px;">${w.startDate?w.startDate.slice(5):''}</div>
             <div style="font-size:0.75rem;color:var(--text);flex:1;"><b>Week ${w.num}</b> — ${w.theme}</div>
-            ${w.quranSurah ? `<div style="font-size:0.62rem;background:rgba(201,168,76,0.1);color:var(--gold);padding:2px 7px;border-radius:10px;">📖 ${w.quranSurah}</div>` : ''}
+            ${_wSurah ? `<div style="font-size:0.62rem;background:rgba(201,168,76,0.1);color:var(--gold);padding:2px 7px;border-radius:10px;">📖 ${_wSurah}</div>` : ''}
             <div style="font-size:0.65rem;color:var(--muted);">▼</div>
           </div>
           <div id="week-${w.startDate}" style="display:none;margin-top:8px;">
@@ -4201,7 +4211,7 @@ function renderAIPlan() {
               </div>` : '';
             }).join('')}
           </div>
-        </div>`).join('');
+        </div>`;}).join('');
 
       return `<div style="margin-bottom:12px;">
         <div style="font-size:0.72rem;font-weight:700;color:var(--text);margin-bottom:6px;padding:6px 10px;background:rgba(255,255,255,0.03);border-radius:8px;display:flex;align-items:center;gap:8px;">
