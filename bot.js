@@ -1323,40 +1323,61 @@ app.post('/unsubscribe', (req, res) => {
 // Parses a freeform paste of video titles/links into daily study sessions.
 // Each blank-line-separated group = one session assigned to the next study day.
 app.post('/plan-studies', async (req, res) => {
-  const { rawText, startDate, month } = req.body;
+  const { rawText, startDate, month, context = {} } = req.body;
   if (!rawText) return res.status(400).json({ error: 'rawText required' });
   if (!process.env.OPENAI_API_KEY) return res.status(500).json({ error: 'OpenAI not configured' });
 
-  try {
-    const prompt = `You are a study planner. Parse the following freeform list of video topics/links into daily study sessions.
+  const skipDays  = context.skipDays?.length ? context.skipDays.join(', ') : 'Sunday';
+  const pace      = context.pace || 'normal';
+  const timeBlock = context.timeBlock || '11:00–13:00';
+  const sessionM  = context.sessionMins || 90;
+  const goal      = context.goal || '';
+  const dailyCtx  = context.dailyContext || 'work 01–09, gym twice a day';
 
-RAW TEXT:
+  const paceRule = pace === 'relaxed'   ? '1 video per session (one session per day)'
+                 : pace === 'intensive' ? '2-3 videos per session where related'
+                 : '1-2 videos per session — pair related topics together';
+
+  try {
+    const prompt = `You are a personal study planner for Azizbek in Tashkent (UTC+5).
+Parse the following video list into daily study sessions fitted into his real schedule.
+
+CONTEXT:
+- Batch goal: ${goal || 'not specified'}
+- Study time: ${timeBlock} (${sessionM} minutes per session)
+- Days off / skip: ${skipDays}
+- Daily schedule: ${dailyCtx}
+- Pace: ${paceRule}
+- Start date: ${startDate || 'today'}
+
+RAW VIDEO LIST (blank line = natural group):
 """
 ${rawText.trim()}
 """
 
 RULES:
-1. Groups separated by blank lines = one session (typically 1-2 videos per session)
-2. Assign sessions to consecutive weekdays starting from ${startDate || 'today'}, skipping Sundays (day off)
-3. If a line contains a YouTube URL, extract it as the "url" for that item
-4. Clean up titles: remove trailing commas, fix formatting
-5. DO NOT treat individual videos as goals — they are just watch tasks
-6. For each week (Mon-Sat), generate ONE "weekSkill" = brief skill label (e.g. "Tax compliance", "Brokerage basics")
-7. For the whole batch, generate ONE "monthSkill" = overall knowledge area
+1. Each blank-line group = one session. Pair items within a group if pace allows.
+2. Skip ${skipDays}. Assign Mon–Sat only (unless context says otherwise).
+3. Extract any YouTube URL found on the same line as a title → set as "url".
+4. Clean up titles: remove trailing commas, strip redundant punctuation.
+5. "estimatedMinutes" = realistic watch + note-taking time (use sessionMins as guide).
+6. "weekSkill" = one short skill label per calendar week (not per session).
+7. "monthSkill" = overall skill gained from the whole batch.
+8. "time" = the start of the study block (e.g. "11:00").
 
-OUTPUT THIS EXACT JSON (no extra text):
+OUTPUT EXACTLY THIS JSON SCHEMA:
 {
   "month": "${month || new Date().toISOString().slice(0,7)}",
-  "monthSkill": "short overall skill name",
+  "monthSkill": "short skill name",
   "sessions": [
     {
       "date": "YYYY-MM-DD",
-      "sessionTitle": "Short combined title of the pair",
+      "time": "HH:MM",
+      "sessionTitle": "Short combined title",
       "weekSkill": "skill for this week",
       "estimatedMinutes": 90,
       "items": [
-        { "title": "clean video title", "url": "https://... or null" },
-        { "title": "clean video title", "url": "https://... or null" }
+        { "title": "clean title", "url": "https://... or null" }
       ]
     }
   ]

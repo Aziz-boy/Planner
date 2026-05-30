@@ -156,31 +156,40 @@ body{
   border-bottom:1px solid rgba(201,168,76,0.08);
   text-shadow: 0 0 20px rgba(201,168,76,0.2);
 }
-.titem{
-  display:flex;align-items:center;gap:9px;
-  padding:9px 10px;border-radius:8px;cursor:pointer;
-  margin-bottom:3px;transition:all .15s;border:1px solid transparent;
-}
-.titem:hover{
-  background:rgba(201,168,76,0.04);
-  border-color:rgba(201,168,76,0.12);
-}
+/* ── Legacy task list (used in weekly/tracker) ─────────────── */
+.titem{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:8px;cursor:pointer;margin-bottom:3px;transition:all .15s;border:1px solid transparent;}
+.titem:hover{background:rgba(201,168,76,0.04);border-color:rgba(201,168,76,0.12);}
 .titem.done{opacity:0.45;}
 .titem.done .ttext{text-decoration:line-through;}
-.tcb{
-  width:18px;height:18px;border-radius:5px;
-  border:1.5px solid rgba(201,168,76,0.22);
-  display:flex;align-items:center;justify-content:center;
-  flex-shrink:0;transition:all .2s;font-size:0.6rem;
-}
-.titem:hover .tcb{ border-color:rgba(201,168,76,0.5); }
-.titem.done .tcb{
-  border-color:transparent;
-  background: linear-gradient(135deg, var(--green), #2A8A52);
-  color:#fff;
-  box-shadow: 0 0 10px rgba(76,175,125,0.3);
-}
+.tcb{width:18px;height:18px;border-radius:5px;border:1.5px solid rgba(201,168,76,0.22);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;font-size:0.6rem;}
+.titem:hover .tcb{border-color:rgba(201,168,76,0.5);}
+.titem.done .tcb{border-color:transparent;background:linear-gradient(135deg,var(--green),#2A8A52);color:#fff;box-shadow:0 0 10px rgba(76,175,125,0.3);}
 .ttext{font-size:0.8rem;line-height:1.4;flex:1;}
+
+/* ── Daily Timeline ─────────────────────────────────────────── */
+.tl-wrap{padding:0 4px;}
+.tl-prog{display:flex;align-items:center;gap:10px;padding:10px 16px;background:rgba(255,255,255,0.02);border-radius:10px;margin-bottom:12px;border:1px solid rgba(255,255,255,0.05);}
+.tl-prog-bar{flex:1;height:5px;background:var(--dark4);border-radius:3px;overflow:hidden;}
+.tl-prog-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--gold),var(--gold-light));transition:width .4s;}
+.tl-item{display:flex;align-items:center;gap:0;cursor:pointer;position:relative;min-height:46px;}
+.tl-item:active{opacity:0.8;}
+.tl-time{width:46px;font-size:0.65rem;color:var(--muted);font-variant-numeric:tabular-nums;flex-shrink:0;padding:0 4px 0 8px;text-align:right;line-height:1;}
+.tl-spine{width:20px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;position:relative;align-self:stretch;}
+.tl-spine::before{content:'';position:absolute;top:0;bottom:0;left:50%;width:1px;background:rgba(255,255,255,0.06);transform:translateX(-50%);}
+.tl-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;position:relative;z-index:2;margin-top:18px;transition:transform .2s,box-shadow .2s;}
+.tl-item:hover .tl-dot{transform:scale(1.3);}
+.tl-body{flex:1;padding:8px 12px 8px 8px;border-radius:8px;margin:3px 6px 3px 2px;transition:background .15s;}
+.tl-item:hover .tl-body{background:rgba(255,255,255,0.035);}
+.tl-row-text{font-size:0.82rem;color:var(--text);line-height:1.35;}
+.tl-row-sub{font-size:0.62rem;color:var(--muted);margin-top:2px;}
+.tl-link{font-size:0.62rem;color:var(--orange);text-decoration:none;background:rgba(224,122,48,0.12);padding:2px 7px;border-radius:10px;margin-left:4px;white-space:nowrap;}
+.tl-chk{width:22px;height:22px;border-radius:6px;border:1.5px solid rgba(201,168,76,0.25);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:0.6rem;margin-right:8px;transition:all .2s;color:transparent;}
+.tl-item.tl-done .tl-row-text{text-decoration:line-through;opacity:0.38;}
+.tl-item.tl-done .tl-chk{background:var(--green);border-color:var(--green);color:#000;font-weight:700;}
+.tl-item.tl-done .tl-dot{opacity:0.3;}
+.tl-now-line{position:relative;display:flex;align-items:center;margin:2px 0;z-index:5;}
+.tl-now-line::before{content:'';position:absolute;left:46px;right:0;height:2px;background:var(--red);border-radius:1px;opacity:0.85;}
+.tl-now-label{position:absolute;left:0;width:46px;font-size:0.55rem;color:var(--red);text-align:right;padding-right:4px;font-weight:700;}
 .ttime{font-size:0.62rem;color:var(--muted);white-space:nowrap;flex-shrink:0;}
 .tcat{width:6px;height:6px;border-radius:50%;flex-shrink:0;box-shadow:0 0 4px currentColor;}
 
@@ -1418,17 +1427,75 @@ hr{ border-color: rgba(201,168,76,0.07); }
 
     <!-- Input area -->
     <div id="studyInputArea">
-      <textarea id="studyRawText" rows="8"
-        style="width:100%;background:rgba(255,255,255,0.03);border:1px solid rgba(74,144,217,0.2);border-radius:8px;color:var(--text);padding:10px 12px;font-size:0.76rem;line-height:1.6;font-family:'DM Sans',sans-serif;resize:vertical;"
-        placeholder="Paste your video titles and links here.
-Each blank line = new study session (1 day).
-Example:
+      <!-- ── Context questions ─────────────────────────────────── -->
+      <div style="background:rgba(74,144,217,0.04);border:1px solid rgba(74,144,217,0.12);border-radius:10px;padding:12px 14px;margin-bottom:12px;">
+        <div style="font-size:0.72rem;font-weight:700;color:#4A90D9;margin-bottom:10px;">📋 Monthly Overview</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+          <div>
+            <label style="font-size:0.65rem;color:var(--muted);display:block;margin-bottom:3px;">Goal for this batch?</label>
+            <input id="studyGoal" type="text" placeholder="e.g. master tender &amp; brokerage"
+              style="width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(74,144,217,0.18);border-radius:6px;color:var(--text);padding:5px 8px;font-size:0.74rem;font-family:'DM Sans',sans-serif;">
+          </div>
+          <div>
+            <label style="font-size:0.65rem;color:var(--muted);display:block;margin-bottom:3px;">Session length</label>
+            <select id="studySessionLen" style="width:100%;background:rgba(20,20,26,0.9);border:1px solid rgba(74,144,217,0.18);border-radius:6px;color:var(--text);padding:5px 8px;font-size:0.74rem;font-family:'DM Sans',sans-serif;">
+              <option value="60">1 hour</option>
+              <option value="90" selected>1.5 hours</option>
+              <option value="120">2 hours</option>
+              <option value="150">2.5 hours</option>
+            </select>
+          </div>
+        </div>
+        <div style="font-size:0.72rem;font-weight:700;color:#4A90D9;margin:10px 0 8px;">📅 Weekly Routine</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+          <div>
+            <label style="font-size:0.65rem;color:var(--muted);display:block;margin-bottom:4px;">Skip which days?</label>
+            <div style="display:flex;gap:5px;flex-wrap:wrap;">
+              <label style="font-size:0.65rem;color:var(--muted);cursor:pointer;display:flex;gap:2px;align-items:center;"><input type="checkbox" id="skipDayMon" style="accent-color:#4A90D9"> Mon</label>
+              <label style="font-size:0.65rem;color:var(--muted);cursor:pointer;display:flex;gap:2px;align-items:center;"><input type="checkbox" id="skipDayTue" style="accent-color:#4A90D9"> Tue</label>
+              <label style="font-size:0.65rem;color:var(--muted);cursor:pointer;display:flex;gap:2px;align-items:center;"><input type="checkbox" id="skipDayWed" style="accent-color:#4A90D9"> Wed</label>
+              <label style="font-size:0.65rem;color:var(--muted);cursor:pointer;display:flex;gap:2px;align-items:center;"><input type="checkbox" id="skipDayThu" style="accent-color:#4A90D9"> Thu</label>
+              <label style="font-size:0.65rem;color:var(--muted);cursor:pointer;display:flex;gap:2px;align-items:center;"><input type="checkbox" id="skipDayFri" style="accent-color:#4A90D9"> Fri</label>
+              <label style="font-size:0.65rem;color:var(--muted);cursor:pointer;display:flex;gap:2px;align-items:center;"><input type="checkbox" id="skipDaySat" style="accent-color:#4A90D9"> Sat</label>
+              <label style="font-size:0.65rem;color:var(--muted);cursor:pointer;display:flex;gap:2px;align-items:center;"><input type="checkbox" id="skipDaySun" checked style="accent-color:#4A90D9"> Sun</label>
+            </div>
+          </div>
+          <div>
+            <label style="font-size:0.65rem;color:var(--muted);display:block;margin-bottom:3px;">Study time block</label>
+            <div style="display:flex;gap:4px;align-items:center;">
+              <input id="studyTimeFrom" type="time" value="11:00" style="flex:1;background:rgba(20,20,26,0.9);border:1px solid rgba(74,144,217,0.18);border-radius:6px;color:var(--text);padding:5px 6px;font-size:0.74rem;font-family:'DM Sans',sans-serif;">
+              <span style="font-size:0.65rem;color:var(--muted);">–</span>
+              <input id="studyTimeTo" type="time" value="13:00" style="flex:1;background:rgba(20,20,26,0.9);border:1px solid rgba(74,144,217,0.18);border-radius:6px;color:var(--text);padding:5px 6px;font-size:0.74rem;font-family:'DM Sans',sans-serif;">
+            </div>
+          </div>
+        </div>
+        <div style="font-size:0.72rem;font-weight:700;color:#4A90D9;margin:10px 0 8px;">🕐 Daily Context</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div>
+            <label style="font-size:0.65rem;color:var(--muted);display:block;margin-bottom:3px;">What else fills your day?</label>
+            <input id="studyDailyContext" type="text" placeholder="work 01–09, gym 09:30, gym 16:30"
+              style="width:100%;background:rgba(255,255,255,0.04);border:1px solid rgba(74,144,217,0.18);border-radius:6px;color:var(--text);padding:5px 8px;font-size:0.74rem;font-family:'DM Sans',sans-serif;">
+          </div>
+          <div>
+            <label style="font-size:0.65rem;color:var(--muted);display:block;margin-bottom:3px;">Pace preference</label>
+            <select id="studyPace" style="width:100%;background:rgba(20,20,26,0.9);border:1px solid rgba(74,144,217,0.18);border-radius:6px;color:var(--text);padding:5px 8px;font-size:0.74rem;font-family:'DM Sans',sans-serif;">
+              <option value="relaxed">Relaxed (1 video/day)</option>
+              <option value="normal" selected>Normal (1–2/day)</option>
+              <option value="intensive">Intensive (2–3/day)</option>
+            </select>
+          </div>
+        </div>
+      </div>
 
-YaTT ishlashidagi xatolar 6-DARS,
+      <!-- ── Video list paste ──────────────────────────────────── -->
+      <label style="font-size:0.72rem;font-weight:700;color:#4A90D9;display:block;margin-bottom:6px;">📺 Paste your video list (blank line = new day)</label>
+      <textarea id="studyRawText" rows="7"
+        style="width:100%;background:rgba(255,255,255,0.03);border:1px solid rgba(74,144,217,0.2);border-radius:8px;color:var(--text);padding:10px 12px;font-size:0.76rem;line-height:1.6;font-family:'DM Sans',sans-serif;resize:vertical;"
+        placeholder="YaTT ishlashidagi xatolar 6-DARS,
 Aylanmadan olinadigan soliqda xatolar 7-DARS.
 
-Korxonalar nega ОБНАЛ qiladi?,
-Jismoniy shaxslar daromadlarini deklaratsiyalash."></textarea>
+Davlat xaridlari: https://youtu.be/...
+Broker kim? https://youtu.be/..."></textarea>
       <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap;">
         <div style="flex:1;">
           <label style="font-size:0.68rem;color:var(--muted);display:block;margin-bottom:3px;">Study starts from</label>
@@ -1942,9 +2009,12 @@ const TRACKERS = [
 // STATE HELPERS
 // ═══════════════════════════════════════════
 function dateKey(d) { return d.toISOString().split('T')[0]; }
-function addDays(d,n) { const r=new Date(d); r.setDate(r.getDate()+n); return r; }
+// Always use UTC operations so results are correct on any device timezone
+function addDays(d,n) { const r=new Date(d); r.setUTCDate(r.getUTCDate()+n); return r; }
 function clamp(d) { if(d<START)return new Date(START); if(d>END)return new Date(END); return new Date(d); }
-function getMonday(d) { const r=new Date(d); const dow=r.getDay(); r.setDate(r.getDate()-(dow===0?6:dow-1)); return r; }
+// UTC-safe today: clean UTC-midnight date for current Tashkent day
+function todayUTC() { return new Date(tashKey()); }
+function getMonday(d) { const r=new Date(d); const dow=r.getUTCDay(); r.setUTCDate(r.getUTCDate()-(dow===0?6:dow-1)); return r; }
 
 function getTask(dateStr,id) { return !!(state[dateStr]&&state[dateStr][id]); }
 
@@ -2014,7 +2084,7 @@ function overallStats() {
 // ═══════════════════════════════════════════
 // NAVIGATION STATE
 // ═══════════════════════════════════════════
-let curDate = clamp(nowTashkent());
+let curDate  = clamp(todayUTC());   // UTC midnight — safe on all timezones
 let wkOffset = 0;
 let curMonth = Math.max(5, Math.min(12, nowTashkent().getUTCMonth()+1));
 
@@ -2042,9 +2112,9 @@ function renderAll() {
 function renderDaily() {
   const d=curDate, key=dateKey(d);
   const isToday=key===tashKey();
-  document.getElementById('dowDisp').textContent=DAYS_FULL[d.getDay()];
+  document.getElementById('dowDisp').textContent=DAYS_FULL[d.getUTCDay()];
   document.getElementById('ddateDisp').innerHTML=(isToday?'<span class="today-dot"></span>':'')+
-    d.getDate()+' '+MONTHS_SHORT[d.getMonth()+1]+' 2026';
+    d.getUTCDate()+' '+MONTHS_SHORT[d.getUTCMonth()+1]+' 2026';
   document.getElementById('prevDay').disabled=d<=START;
   document.getElementById('nextDay').disabled=d>=END;
 
@@ -2066,55 +2136,75 @@ function renderDaily() {
     }
   }
 
-  const tasks=getTasksForDate(d);
-  const stats=dayStats(d);
-  const half=Math.ceil(tasks.length/2);
+  // Sort tasks by time
+  const tasks = getTasksForDate(d).slice().sort((a,b) => (a.time||'00:00').localeCompare(b.time||'00:00'));
+  const stats  = dayStats(d);
 
-  function taskHTML(list){
-    return list.map(t=>{
-      const done=getTask(key,t.id);
-      const c=CATS[t.cat];
-      const linkHTML = t.url
-        ? `<a href="${t.url}" target="_blank" onclick="event.stopPropagation()" style="color:var(--orange);font-size:0.62rem;margin-left:4px;text-decoration:none;flex-shrink:0">▶ Open</a>`
-        : '';
-      return `<div class="titem${done?' done':''}" onclick="toggleTask('${key}','${t.id}')">
-        <div class="tcb">${done?'✓':''}</div>
-        <div class="tcat" style="background:${c.color}"></div>
-        <div class="ttext">${t.text}</div>
-        ${linkHTML}
-        <div class="ttime">${t.time}</div>
-      </div>`;
-    }).join('');
+  // Current Tashkent hour:minute (only shown for today)
+  const nowH = nowTashkent().getUTCHours();
+  const nowM = nowTashkent().getUTCMinutes();
+  const nowMins = nowH * 60 + nowM;
+  const nowLabel = String(nowH).padStart(2,'0') + ':' + String(nowM).padStart(2,'0');
+
+  // Build timeline rows, inserting "NOW" line at correct position
+  let nowInserted = false;
+  const rows = [];
+  for (let i = 0; i < tasks.length; i++) {
+    const t = tasks[i];
+    const [th, tm] = (t.time||'00:00').split(':').map(Number);
+    const taskMins = th * 60 + tm;
+
+    // Insert NOW line before the first future task (today only)
+    if (isToday && !nowInserted && taskMins > nowMins) {
+      rows.push(`<div class="tl-now-line" style="height:14px;"><div class="tl-now-label">${nowLabel}</div></div>`);
+      nowInserted = true;
+    }
+
+    const done = getTask(key, t.id);
+    const c    = CATS[t.cat] || {color:'#888'};
+
+    // Study task: show sub-items as subtitle
+    const subText = t.studyItems
+      ? t.studyItems.map(si => si.title).join(' · ')
+      : '';
+
+    rows.push(`
+      <div class="tl-item${done?' tl-done':''}" onclick="toggleTask('${key}','${t.id}')">
+        <div class="tl-time">${t.time||''}</div>
+        <div class="tl-spine">
+          <div class="tl-dot" style="background:${c.color};box-shadow:0 0 6px ${c.color}55;"></div>
+        </div>
+        <div class="tl-body">
+          <div class="tl-row-text">${t.text}${t.url?`<a href="${t.url}" target="_blank" onclick="event.stopPropagation()" class="tl-link">▶ Watch</a>`:''}</div>
+          ${subText ? `<div class="tl-row-sub">${subText}</div>` : ''}
+        </div>
+        <div class="tl-chk" style="${done?'':'border-color:'+c.color+'44'}">${done?'✓':''}</div>
+      </div>`);
+  }
+  // If today and all tasks are in the past, append NOW at end
+  if (isToday && !nowInserted) {
+    rows.push(`<div class="tl-now-line" style="height:14px;"><div class="tl-now-label">${nowLabel}</div></div>`);
   }
 
   document.getElementById('dayContent').innerHTML=`
-    <div class="day-grid">
-      <div class="task-card">
-        <div class="task-card-hdr">Today's Tasks</div>
-        ${taskHTML(tasks.slice(0,half))}
+    <div class="tl-wrap">
+      <div class="tl-prog">
+        <div style="font-size:0.7rem;color:var(--muted);">${stats.done}/${stats.total} tasks</div>
+        <div class="tl-prog-bar"><div class="tl-prog-fill" style="width:${stats.pct}%"></div></div>
+        <div style="font-size:0.78rem;font-weight:700;color:var(--gold);">${stats.pct}%</div>
+        <div style="font-size:0.65rem;color:var(--muted);">${stats.pts}/${stats.maxPts} pts</div>
       </div>
-      <div class="task-card">
-        <div class="task-card-hdr">Continue</div>
-        ${taskHTML(tasks.slice(half))}
-        <div class="day-prog-row">
-          <div class="dp-lbl">Day Progress</div>
-          <div class="dp-bar"><div class="dp-fill" style="width:${stats.pct}%"></div></div>
-          <div class="dp-pct">${stats.pct}%</div>
-        </div>
-        <div style="text-align:right;font-size:0.68rem;color:var(--muted);margin-top:4px;">
-          ${stats.done}/${stats.total} tasks · ${stats.pts}/${stats.maxPts} pts
-        </div>
-      </div>
+      ${rows.join('')}
     </div>`;
 }
 
 // ── WEEKLY ──
 function renderWeekly() {
-  const today=nowTashkent();
+  const today=todayUTC();
   const mon=addDays(getMonday(clamp(today)), wkOffset*7);
   const sun=addDays(mon,6);
   document.getElementById('wkDisp').textContent=
-    mon.getDate()+' '+MONTHS_SHORT[mon.getMonth()+1]+' – '+sun.getDate()+' '+MONTHS_SHORT[sun.getMonth()+1]+' 2026';
+    mon.getUTCDate()+' '+MONTHS_SHORT[mon.getUTCMonth()+1]+' – '+sun.getUTCDate()+' '+MONTHS_SHORT[sun.getUTCMonth()+1]+' 2026';
 
   // Week cats accumulator (all 7 days)
   let wkCats={};
@@ -2148,7 +2238,7 @@ function renderWeekly() {
     daysHTML+=`<div class="wday${isToday?' today-col':''}">
       <div class="wday-hdr">
         <div class="wday-name" style="${isToday?'color:var(--gold)':''}">${dayNames[i]}</div>
-        <div class="wday-dt">${inRange?d.getDate()+' '+MONTHS_SHORT[d.getMonth()+1]:'—'}</div>
+        <div class="wday-dt">${inRange?d.getUTCDate()+' '+MONTHS_SHORT[d.getUTCMonth()+1]:'—'}</div>
       </div>
       <div class="wday-prog"><div class="wday-pfill" style="width:${stats.pct}%;background:${stats.pct===100?'var(--gold)':'var(--green)'}"></div></div>
       <div class="wday-tasks">${inRange?mini:'<div style="font-size:0.58rem;color:var(--muted);padding:2px">—</div>'}</div>
@@ -2308,7 +2398,7 @@ const MONEY_KEY   = 'life_plan_2026_money';
 const SAVINGS_KEY = 'life_plan_2026_savings';
 let moneyState   = {}; // { 'YYYY-MM-DD': [ {id,cat,name,amount} ] }
 let savingsState = {}; // { '6': {salary, saved}, '7': ... }
-let moneyDate    = nowTashkent(); // Tashkent today
+let moneyDate    = todayUTC(); // Tashkent today
 let moneyWkOff   = 0;
 let moneyMonth   = 6; // default to June (plan start month)
 let moneyTab     = 'day';
@@ -2492,7 +2582,7 @@ function renderMoneyWeekly() {
   const mon   = addDays(getMonday(clamp(today)), moneyWkOff * 7);
   const sun   = addDays(mon, 6);
   document.getElementById('moneyWkDisp').textContent =
-    mon.getDate()+' '+MONTHS_SHORT[mon.getMonth()+1]+' – '+sun.getDate()+' '+MONTHS_SHORT[sun.getMonth()+1]+' 2026';
+    mon.getUTCDate()+" "+MONTHS_SHORT[mon.getUTCMonth()+1]+' – '+sun.getUTCDate()+" "+MONTHS_SHORT[sun.getUTCMonth()+1]+' 2026';
 
   // Build daily totals row
   const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
@@ -2666,7 +2756,7 @@ function renderSavings() {
 }
 
 function changeMoneyDay(n)    { moneyDate=addDays(moneyDate,n); renderMoney(); }
-function moneyGoToday()       { moneyDate=nowTashkent(); renderMoney(); }
+function moneyGoToday()       { moneyDate=todayUTC(); renderMoney(); }
 function changeMoneyWeek(n)   { moneyWkOff+=n; renderMoney(); }
 function moneyGoThisWeek()    { moneyWkOff=0; renderMoney(); }
 function changeMoneyMonth(n)  { moneyMonth=Math.max(1,Math.min(12,moneyMonth+n)); renderMoney(); }
@@ -2674,7 +2764,7 @@ function changeMoneyMonth(n)  { moneyMonth=Math.max(1,Math.min(12,moneyMonth+n))
 
 const DIET_KEY = 'life_plan_2026_diet';
 let dietState = {}; // { 'YYYY-MM-DD': { bread:bool, sugar:bool, water:bool, meal:bool } }
-let dietDate  = clamp(nowTashkent());
+let dietDate  = clamp(todayUTC());
 let dietMonth = Math.max(6, Math.min(12, nowTashkent().getUTCMonth()+1));
 
 const DIET_RULES = [
@@ -2884,7 +2974,7 @@ function renderDiet() {
 }
 
 function changeDietDay(n){ dietDate=clamp(addDays(dietDate,n)); renderDiet(); }
-function dietGoToday(){ dietDate=clamp(nowTashkent()); renderDiet(); }
+function dietGoToday(){ dietDate=clamp(todayUTC()); renderDiet(); }
 function changeDietMonth(n){ dietMonth=Math.max(6,Math.min(12,dietMonth+n)); renderDiet(); }
 
 // ═══════════════════════════════════════════
@@ -2892,7 +2982,7 @@ function changeDietMonth(n){ dietMonth=Math.max(6,Math.min(12,dietMonth+n)); ren
 // ═══════════════════════════════════════════
 const PRAYER_KEY = 'life_plan_2026_prayer';
 let prayerState = {}; // { 'YYYY-MM-DD': { fajr:'ontime'|'late'|'missed', ... } }
-let prayerDate  = nowTashkent();
+let prayerDate  = todayUTC();
 let prayerMonth = 6;
 
 const PRAYERS = [
@@ -3048,7 +3138,7 @@ function renderPrayer(){
 }
 
 function changePrayerDay(n){ prayerDate=addDays(prayerDate,n); renderPrayer(); }
-function prayerGoToday(){ prayerDate=nowTashkent(); renderPrayer(); }
+function prayerGoToday(){ prayerDate=todayUTC(); renderPrayer(); }
 function changePrayerMonth(n){ prayerMonth=Math.max(1,Math.min(12,prayerMonth+n)); renderPrayer(); }
 
 // ═══════════════════════════════════════════
@@ -3056,7 +3146,7 @@ function changePrayerMonth(n){ prayerMonth=Math.max(1,Math.min(12,prayerMonth+n)
 // ═══════════════════════════════════════════
 const WORKOUT_KEY='life_plan_2026_workout';
 let workoutState={}; // { 'YYYY-MM-DD': { type:'chest', exercises:[{id,name,sets,reps,weight,notes}] } }
-let workoutDate=nowTashkent();
+let workoutDate=todayUTC();
 
 function loadWorkoutFromCloud(){
   // loaded via Firebase loadFromCloud()
@@ -3165,7 +3255,7 @@ function renderWorkout(){
 }
 
 function changeWorkoutDay(n){ workoutDate=addDays(workoutDate,n); renderWorkout(); }
-function workoutGoToday(){ workoutDate=nowTashkent(); renderWorkout(); }
+function workoutGoToday(){ workoutDate=todayUTC(); renderWorkout(); }
 
 // ═══════════════════════════════════════════
 // WEEKLY REFLECTION
@@ -3212,7 +3302,7 @@ function renderReflect(){
   const mon=addDays(getMonday(new Date()),reflectWkOff*7);
   const sun=addDays(mon,6);
   document.getElementById('reflectWkDisp').textContent=
-    mon.getDate()+' '+MONTHS_SHORT[mon.getMonth()+1]+' – '+sun.getDate()+' '+MONTHS_SHORT[sun.getMonth()+1]+' 2026';
+    mon.getUTCDate()+" "+MONTHS_SHORT[mon.getUTCMonth()+1]+' – '+sun.getUTCDate()+" "+MONTHS_SHORT[sun.getUTCMonth()+1]+' 2026';
 
   const saved=reflectState[wk]||{scores:{},well:'',bad:'',next:'',grat:''};
 
@@ -3668,7 +3758,7 @@ function showSec(id,tab){
   else renderAll();
 }
 function changeDay(n){ curDate=clamp(addDays(curDate,n)); renderAll(); }
-function goToday(){ curDate=clamp(nowTashkent()); renderAll(); }
+function goToday(){ curDate=clamp(todayUTC()); renderAll(); }
 function changeWeek(n){ wkOffset+=n; renderAll(); }
 function goThisWeek(){ wkOffset=0; renderAll(); }
 function changeMo(n){ curMonth=Math.max(5,Math.min(12,curMonth+n)); renderAll(); }
@@ -4476,11 +4566,23 @@ async function planStudies() {
   if (!raw) { alert('Please paste your video list first.'); return; }
   const startDate = document.getElementById('studyStartDate').value || tashKey();
 
+  // Collect questionnaire answers
+  const skipDays = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+    .filter(d => document.getElementById('skipDay'+d)?.checked);
+  const context = {
+    goal:         document.getElementById('studyGoal')?.value.trim() || '',
+    sessionMins:  parseInt(document.getElementById('studySessionLen')?.value || '90'),
+    skipDays,
+    timeBlock:    (document.getElementById('studyTimeFrom')?.value||'11:00') + '–' + (document.getElementById('studyTimeTo')?.value||'13:00'),
+    dailyContext: document.getElementById('studyDailyContext')?.value.trim() || '',
+    pace:         document.getElementById('studyPace')?.value || 'normal',
+  };
+
   document.getElementById('studyInputArea').style.display  = 'none';
   document.getElementById('studyPlanDisplay').style.display = 'none';
   document.getElementById('studyLoading').style.display    = 'block';
 
-  const msgs = ['Parsing your topics…', 'Grouping into sessions…', 'Assigning to calendar days…', 'Almost done…'];
+  const msgs = ['Reading your context…', 'Parsing topics…', 'Assigning to your schedule…', 'Building calendar…'];
   let mi = 0;
   const msgEl = document.getElementById('studyLoadingMsg');
   const ticker = setInterval(() => { if (mi < msgs.length-1) msgEl.textContent = msgs[++mi]; }, 5000);
@@ -4492,7 +4594,8 @@ async function planStudies() {
       body: JSON.stringify({
         rawText: raw,
         startDate,
-        month: startDate.slice(0,7)
+        month: startDate.slice(0,7),
+        context
       })
     });
     const data = await resp.json();
@@ -4615,10 +4718,10 @@ function mergeStudyTask(date, baseTasks) {
     id:   'study',
     cat:  'finance',
     text: `📚 Study: ${session.sessionTitle}`,
-    time: '11:00',
+    time: session.time || '11:00',
     pts:  3,
     url:  firstUrl,
-    studyItems: session.items // extra for tooltip/detail
+    studyItems: session.items
   };
   // Replace any existing 'study' task, otherwise add after brokerage slot
   const filtered = baseTasks.filter(t => t.id !== 'study');
