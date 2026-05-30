@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>My 2026 Life Plan</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23C9A84C'/><text x='50' y='72' text-anchor='middle' font-size='60' font-family='serif' fill='%2308080A'>🗓</text></svg>">
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23C9A84C'/><text x='50' y='72' text-anchor='middle' font-size='60' font-family='serif' fill='%2308080A'>🗓</text></svg>">
@@ -562,23 +562,32 @@ hr{ border-color: rgba(201,168,76,0.07); }
   .nav{
     position:fixed;bottom:0;left:0;right:0;top:auto;
     flex-direction:row;overflow-x:auto;overflow-y:hidden;
-    padding:0;height:58px;align-items:stretch;
-    border-top:1px solid rgba(201,168,76,0.15);
+    /* tabs occupy 62px; safe-area-inset-bottom pushes nav down on iPhone notch/home-bar */
+    padding:0 0 env(safe-area-inset-bottom, 0px);
+    height:calc(62px + env(safe-area-inset-bottom, 0px));
+    align-items:flex-start;
+    border-top:2px solid rgba(201,168,76,0.22);
     border-bottom:none;
-    box-shadow:0 -4px 24px rgba(0,0,0,0.5);
+    box-shadow:0 -4px 28px rgba(0,0,0,0.6);
     z-index:200;
+    background:rgba(8,8,12,0.96);
   }
   .ntab{
-    flex:0 0 auto;min-width:64px;
+    flex:0 0 auto;min-width:68px;
     display:flex;flex-direction:column;align-items:center;justify-content:center;
-    padding:6px 8px 4px;font-size:0.55rem;letter-spacing:0;
-    border-bottom:none;border-top:2px solid transparent;gap:2px;
+    /* tall tap area — well above the home indicator */
+    padding:10px 10px 8px;font-size:0.6rem;letter-spacing:0;
+    border-bottom:none;border-top:3px solid transparent;gap:3px;
+    min-height:62px;
   }
-  .ntab.active{border-bottom:none;border-top-color:var(--gold);}
-  .nav-icon{width:22px;height:22px;margin-right:0;font-size:0.7rem;}
-  /* push all sections above the bottom nav */
-  .sec{padding-bottom:70px;}
-  #ai-fab{bottom:68px;}
+  .ntab.active{
+    border-bottom:none;border-top-color:var(--gold);
+    background:rgba(201,168,76,0.07);
+  }
+  .nav-icon{width:24px;height:24px;margin-right:0;font-size:0.8rem;}
+  /* push content above nav + safe area */
+  .sec{padding-bottom:calc(72px + env(safe-area-inset-bottom, 20px));}
+  #ai-fab{bottom:calc(72px + env(safe-area-inset-bottom, 20px));}
 }
 
 @media(max-width:480px){
@@ -1458,7 +1467,7 @@ window.saveAllData = async function() {
       weight:   JSON.stringify(window._weightState   ||{}),
       aiPlan:   window._aiPlanState ? JSON.stringify(window._aiPlanState) : null,
       roadmap:  JSON.stringify(window._roadmapState ||{}),
-      savedAt: new Date().toISOString(),
+      savedAt: nowTashkent().toISOString(),
     };
     await setDoc(USER_DOC_REF, payload);
     // localStorage backup
@@ -1619,8 +1628,16 @@ const CATS = {
 const START = new Date('2026-05-30');
 const END   = new Date('2026-12-31');
 
+// ── Tashkent time (UTC+5) — authoritative source for ALL date/time logic ──────
+// Shifts the UTC clock by +5 h so ISO string and UTC accessors give Tashkent values.
+// Use .getUTCFullYear() / .getUTCMonth() / .getUTCDate() / .getUTCDay() / .getUTCHours()
+// on the returned object, or just pass it to dateKey() which uses .toISOString().
+function nowTashkent() { return new Date(Date.now() + 5 * 3600 * 1000); }
+function tashKey()     { return nowTashkent().toISOString().split('T')[0]; } // "YYYY-MM-DD" Tashkent
+function tashMidnight(){ const d=nowTashkent(); d.setUTCHours(0,0,0,0); return d; } // today at 00:00 Tashkent
+
 function getDayType(date) {
-  const dow = date.getDay(); // 0=Sun,6=Sat,1=Mon
+  const dow = date.getUTCDay(); // use UTC — works for both UTC-midnight dates & nowTashkent() shifted dates
   if (dow === 1) return 'monday';
   if (dow === 0) return 'sunday';
   if (dow === 6) return 'saturday';
@@ -1903,7 +1920,7 @@ function catStatsRange(fromDate, toDate, catFilter, countAll) {
   const rangeStart = new Date(Math.max(new Date(fromDate), START));
   const rangeEnd   = new Date(Math.min(new Date(toDate),   END));
   // For "total possible", cap at today unless countAll=true
-  const totalCap   = countAll ? rangeEnd : new Date(Math.min(rangeEnd, new Date()));
+  const totalCap   = countAll ? rangeEnd : new Date(Math.min(rangeEnd, nowTashkent()));
 
   let d = new Date(rangeStart);
   while(d <= rangeEnd){
@@ -1925,7 +1942,7 @@ function catStatsRange(fromDate, toDate, catFilter, countAll) {
 
 // Overall: done / elapsed tasks (what % of what you SHOULD have done by now did you actually do)
 function overallStats() {
-  const today = new Date();
+  const today = nowTashkent();
   let done=0, elapsedTotal=0, allTotal=0;
   let d=new Date(START);
   while(d<=END){
@@ -1944,9 +1961,9 @@ function overallStats() {
 // ═══════════════════════════════════════════
 // NAVIGATION STATE
 // ═══════════════════════════════════════════
-let curDate = clamp(new Date());
+let curDate = clamp(nowTashkent());
 let wkOffset = 0;
-let curMonth = Math.max(5, Math.min(12, new Date().getMonth()+1));
+let curMonth = Math.max(5, Math.min(12, nowTashkent().getUTCMonth()+1));
 
 // ═══════════════════════════════════════════
 // RENDER
@@ -1971,7 +1988,7 @@ function renderAll() {
 // ── DAILY ──
 function renderDaily() {
   const d=curDate, key=dateKey(d);
-  const isToday=key===dateKey(new Date());
+  const isToday=key===tashKey();
   document.getElementById('dowDisp').textContent=DAYS_FULL[d.getDay()];
   document.getElementById('ddateDisp').innerHTML=(isToday?'<span class="today-dot"></span>':'')+
     d.getDate()+' '+MONTHS_SHORT[d.getMonth()+1]+' 2026';
@@ -2034,7 +2051,7 @@ function renderDaily() {
 
 // ── WEEKLY ──
 function renderWeekly() {
-  const today=new Date();
+  const today=nowTashkent();
   const mon=addDays(getMonday(clamp(today)), wkOffset*7);
   const sun=addDays(mon,6);
   document.getElementById('wkDisp').textContent=
@@ -2112,7 +2129,7 @@ function renderMonthly() {
   const mEnd     = new Date(2026, curMonth,   0); // last day of month
   const planStart= new Date(Math.max(mStart,  START));
   const planEnd  = new Date(Math.min(mEnd,    END));
-  const today    = new Date();
+  const today    = nowTashkent();
 
   // Month state: past / current / future
   const isFuture  = today < planStart;
@@ -2232,7 +2249,7 @@ const MONEY_KEY   = 'life_plan_2026_money';
 const SAVINGS_KEY = 'life_plan_2026_savings';
 let moneyState   = {}; // { 'YYYY-MM-DD': [ {id,cat,name,amount} ] }
 let savingsState = {}; // { '6': {salary, saved}, '7': ... }
-let moneyDate    = new Date(); // no clamp — allow logging any date
+let moneyDate    = nowTashkent(); // Tashkent today
 let moneyWkOff   = 0;
 let moneyMonth   = 6; // default to June (plan start month)
 let moneyTab     = 'day';
@@ -2365,7 +2382,7 @@ function renderMoneySummary() {
 function renderMoneyDaily() {
   const key  = dateKey(moneyDate);
   const dow  = DAYS_FULL[moneyDate.getDay()];
-  const isToday = key === dateKey(new Date());
+  const isToday = key === tashKey();
   document.getElementById('moneyDowDisp').textContent = dow;
   document.getElementById('moneyDateDisp').innerHTML =
     (isToday ? '<span class="today-dot"></span>' : '') +
@@ -2412,7 +2429,7 @@ function renderMoneyDaily() {
 }
 
 function renderMoneyWeekly() {
-  const today = new Date();
+  const today = nowTashkent();
   const mon   = addDays(getMonday(clamp(today)), moneyWkOff * 7);
   const sun   = addDays(mon, 6);
   document.getElementById('moneyWkDisp').textContent =
@@ -2511,7 +2528,7 @@ function renderMoneyMonthly() {
     const inR = dd >= START && dd <= END;
     const intensity = maxDay > 0 && dt > 0 ? Math.max(0.15, dt/maxDay) : 0;
     const bg  = inR && dt > 0 ? `rgba(209,74,74,${intensity})` : '#1a1a1a';
-    const isT = k === dateKey(new Date());
+    const isT = k === tashKey();
     calHTML += `<div style="aspect-ratio:1;border-radius:4px;background:${bg};display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:0.55rem;border:${isT?'2px solid var(--gold)':'1px solid #222'};padding:1px;" title="${dt>0?fmtNum(dt)+' so\'m':''}">
       <div style="color:var(--muted)">${inR?day:''}</div>
       ${dt>0?`<div style="color:#FF8888;font-weight:700">${dt>=1000?(dt/1000).toFixed(0)+'k':dt}</div>`:''}
@@ -2590,7 +2607,7 @@ function renderSavings() {
 }
 
 function changeMoneyDay(n)    { moneyDate=addDays(moneyDate,n); renderMoney(); }
-function moneyGoToday()       { moneyDate=new Date(); renderMoney(); }
+function moneyGoToday()       { moneyDate=nowTashkent(); renderMoney(); }
 function changeMoneyWeek(n)   { moneyWkOff+=n; renderMoney(); }
 function moneyGoThisWeek()    { moneyWkOff=0; renderMoney(); }
 function changeMoneyMonth(n)  { moneyMonth=Math.max(1,Math.min(12,moneyMonth+n)); renderMoney(); }
@@ -2598,8 +2615,8 @@ function changeMoneyMonth(n)  { moneyMonth=Math.max(1,Math.min(12,moneyMonth+n))
 
 const DIET_KEY = 'life_plan_2026_diet';
 let dietState = {}; // { 'YYYY-MM-DD': { bread:bool, sugar:bool, water:bool, meal:bool } }
-let dietDate  = clamp(new Date());
-let dietMonth = Math.max(6, Math.min(12, new Date().getMonth()+1));
+let dietDate  = clamp(nowTashkent());
+let dietMonth = Math.max(6, Math.min(12, nowTashkent().getUTCMonth()+1));
 
 const DIET_RULES = [
   {id:'bread', label:'No bread today',          emoji:'🍞', color:'#E07A30'},
@@ -2658,7 +2675,7 @@ function getDietStreak() {
 function renderDiet() {
   const key = dateKey(dietDate);
   const dow = DAYS_FULL[dietDate.getDay()];
-  const isToday = key === dateKey(new Date());
+  const isToday = key === tashKey();
   document.getElementById('dietDowDisp').textContent = dow;
   document.getElementById('dietDateDisp').innerHTML =
     (isToday ? '<span class="today-dot"></span>' : '') +
@@ -2698,7 +2715,7 @@ function renderDiet() {
   // Calculate all-time compliance
   let totalDays=0, fullDays=0, partDays=0;
   let d=new Date(START);
-  const today=new Date();
+  const today=nowTashkent();
   while(d<=today&&d<=END){
     const k=dateKey(d);
     const s=dietDayScore(k);
@@ -2743,7 +2760,7 @@ function renderDiet() {
     const s  = dietDayScore(k);
     const inRange = dd>=START&&dd<=END;
     const bg = inRange && s>0 ? dietDayColor(s) : '#1e1e1e';
-    const isT = k===dateKey(new Date());
+    const isT = k===tashKey();
     return `<div style="text-align:center;">
       <div style="font-size:0.62rem;color:var(--muted);margin-bottom:4px;${isT?'color:var(--gold)':''}">${dn}</div>
       <div style="height:40px;border-radius:6px;background:${bg};display:flex;align-items:center;justify-content:center;
@@ -2795,7 +2812,7 @@ function renderDiet() {
     const s=dietDayScore(k);
     const inRange=dd>=START&&dd<=END;
     const bg=inRange&&s>0?dietDayColor(s):'#1a1a1a';
-    const isT=k===dateKey(new Date());
+    const isT=k===tashKey();
     calHTML+=`<div style="aspect-ratio:1;border-radius:5px;background:${bg};
       display:flex;align-items:center;justify-content:center;font-size:0.65rem;
       color:${s===4?'#000':s>0?'#000':'var(--muted)'};font-weight:600;
@@ -2808,7 +2825,7 @@ function renderDiet() {
 }
 
 function changeDietDay(n){ dietDate=clamp(addDays(dietDate,n)); renderDiet(); }
-function dietGoToday(){ dietDate=clamp(new Date()); renderDiet(); }
+function dietGoToday(){ dietDate=clamp(nowTashkent()); renderDiet(); }
 function changeDietMonth(n){ dietMonth=Math.max(6,Math.min(12,dietMonth+n)); renderDiet(); }
 
 // ═══════════════════════════════════════════
@@ -2816,7 +2833,7 @@ function changeDietMonth(n){ dietMonth=Math.max(6,Math.min(12,dietMonth+n)); ren
 // ═══════════════════════════════════════════
 const PRAYER_KEY = 'life_plan_2026_prayer';
 let prayerState = {}; // { 'YYYY-MM-DD': { fajr:'ontime'|'late'|'missed', ... } }
-let prayerDate  = new Date();
+let prayerDate  = nowTashkent();
 let prayerMonth = 6;
 
 const PRAYERS = [
@@ -2883,7 +2900,7 @@ function getPrayerStreak(){
 function renderPrayer(){
   renderSurahSchedule();
   const key=dateKey(prayerDate);
-  const isToday=key===dateKey(new Date());
+  const isToday=key===tashKey();
   document.getElementById('prayerDowDisp').textContent=DAYS_FULL[prayerDate.getDay()];
   document.getElementById('prayerDateDisp').innerHTML=(isToday?'<span class="today-dot"></span>':'')+
     prayerDate.getDate()+' '+MONTHS_SHORT[prayerDate.getMonth()+1]+' 2026';
@@ -2906,7 +2923,7 @@ function renderPrayer(){
   const streak=getPrayerStreak();
   let totalOntime=0,totalPrayed=0,totalLogged=0;
   let d=new Date(START);
-  while(d<=new Date()&&d<=END){
+  while(d<=nowTashkent()&&d<=END){
     const k=dateKey(d);
     const sc=prayerDayScore(k);
     if(sc.total>0){ totalLogged++; totalOntime+=sc.ontime; totalPrayed+=sc.ontime+sc.late; }
@@ -2933,13 +2950,13 @@ function renderPrayer(){
     </div>`;
 
   // Weekly heatmap
-  const mon=getMonday(new Date());
+  const mon=getMonday(nowTashkent());
   document.getElementById('prayerWeekHeat').innerHTML=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((dn,i)=>{
     const dd=addDays(mon,i);
     const k=dateKey(dd);
     const sc=prayerDayScore(k);
     const bg=prayerDayColor(k);
-    const isT=k===dateKey(new Date());
+    const isT=k===tashKey();
     return `<div style="text-align:center;">
       <div style="font-size:0.62rem;color:${isT?'var(--gold)':'var(--muted)'};margin-bottom:4px;">${dn}</div>
       <div style="border-radius:6px;background:${bg};padding:8px 4px;border:${isT?'2px solid var(--gold)':'1px solid #2a2520'};">
@@ -2964,7 +2981,7 @@ function renderPrayer(){
     const dd=new Date(2026,prayerMonth-1,day);
     const k=dateKey(dd);
     const bg=prayerDayColor(k);
-    const isT=k===dateKey(new Date());
+    const isT=k===tashKey();
     const {ontime,late,missed}=prayerDayScore(k);
     calHTML+=`<div style="aspect-ratio:1;border-radius:5px;background:${bg};display:flex;align-items:center;justify-content:center;font-size:0.62rem;font-weight:600;border:${isT?'2px solid var(--gold)':'1px solid #222'};color:${bg==='#1a1a1a'?'var(--muted)':'rgba(0,0,0,0.8)'};" title="${ontime} on time, ${late} late, ${missed} missed">${day}</div>`;
   }
@@ -2972,7 +2989,7 @@ function renderPrayer(){
 }
 
 function changePrayerDay(n){ prayerDate=addDays(prayerDate,n); renderPrayer(); }
-function prayerGoToday(){ prayerDate=new Date(); renderPrayer(); }
+function prayerGoToday(){ prayerDate=nowTashkent(); renderPrayer(); }
 function changePrayerMonth(n){ prayerMonth=Math.max(1,Math.min(12,prayerMonth+n)); renderPrayer(); }
 
 // ═══════════════════════════════════════════
@@ -2980,7 +2997,7 @@ function changePrayerMonth(n){ prayerMonth=Math.max(1,Math.min(12,prayerMonth+n)
 // ═══════════════════════════════════════════
 const WORKOUT_KEY='life_plan_2026_workout';
 let workoutState={}; // { 'YYYY-MM-DD': { type:'chest', exercises:[{id,name,sets,reps,weight,notes}] } }
-let workoutDate=new Date();
+let workoutDate=nowTashkent();
 
 function loadWorkoutFromCloud(){
   // loaded via Firebase loadFromCloud()
@@ -3033,7 +3050,7 @@ const SESSION_COLORS={cardio:'#4A90D9',chest:'#D94A4A',back:'#B464C8',legs:'#4CA
 
 function renderWorkout(){
   const key=dateKey(workoutDate);
-  const isToday=key===dateKey(new Date());
+  const isToday=key===tashKey();
   document.getElementById('workoutDowDisp').textContent=DAYS_FULL[workoutDate.getDay()];
   document.getElementById('workoutDateDisp').innerHTML=(isToday?'<span class="today-dot"></span>':'')+
     workoutDate.getDate()+' '+MONTHS_SHORT[workoutDate.getMonth()+1]+' 2026';
@@ -3089,7 +3106,7 @@ function renderWorkout(){
 }
 
 function changeWorkoutDay(n){ workoutDate=addDays(workoutDate,n); renderWorkout(); }
-function workoutGoToday(){ workoutDate=new Date(); renderWorkout(); }
+function workoutGoToday(){ workoutDate=nowTashkent(); renderWorkout(); }
 
 // ═══════════════════════════════════════════
 // WEEKLY REFLECTION
@@ -3197,23 +3214,24 @@ function reflectThisWeek(){ reflectWkOff=0; renderReflect(); }
 // DASHBOARD
 // ═══════════════════════════════════════════
 function renderDashboard(){
-  const today = new Date();
-  const key   = dateKey(today);
-  const hour  = today.getHours();
-  const greeting = hour<12?'Good morning':'hour'<17?'Good afternoon':'Good evening';
+  const today = nowTashkent(); // Tashkent time — use UTC accessors
+  const key   = tashKey();
+  const hour  = today.getUTCHours();
+  const greeting = hour<12?'Good morning':hour<17?'Good afternoon':'Good evening';
   const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const mo = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
   document.getElementById('dashGreeting').textContent =
     `${hour<12?'🌅':hour<17?'☀️':'🌙'} ${greeting}, brother!`;
   document.getElementById('dashDate').textContent =
-    `${dayNames[today.getDay()]}, ${today.getDate()} ${mo[today.getMonth()]} 2026`;
+    `${dayNames[today.getUTCDay()]}, ${today.getUTCDate()} ${mo[today.getUTCMonth()]} 2026`;
 
-  // Countdown
+  // Countdown — compare UTC midnight dates with Tashkent today
+  const todayUTC  = tashMidnight(); // today at 00:00 Tashkent = correct UTC reference
   const endOf2026 = new Date('2026-12-31');
   const sepStart  = new Date('2026-09-01');
-  const daysLeft  = Math.ceil((endOf2026-today)/(1000*60*60*24));
-  const daysSep   = Math.ceil((sepStart-today)/(1000*60*60*24));
+  const daysLeft  = Math.ceil((endOf2026-todayUTC)/(1000*60*60*24));
+  const daysSep   = Math.ceil((sepStart-todayUTC)/(1000*60*60*24));
   document.getElementById('dashCountdown').innerHTML =
     `<div style="color:var(--gold);font-weight:700;font-size:1rem;">${daysLeft} days left in 2026</div>` +
     (daysSep>0?`<div style="color:var(--muted);font-size:0.72rem;margin-top:2px;">${daysSep} days until school starts</div>`:'');
@@ -3371,7 +3389,7 @@ function renderStreakWall(){
   const allDays=[];
   let d=new Date(START);
   while(d<=END){ allDays.push(new Date(d)); d=addDays(d,1); }
-  const today=new Date();
+  const today=nowTashkent();
 
   let html='';
   STREAK_HABITS.forEach(h=>{
@@ -3477,7 +3495,7 @@ function cycleYtStatus(epId){
 function getYtStatus(epId){ return ytState[epId]||'none'; }
 
 function getCurrentEpisode(){
-  const today = new Date();
+  const today = nowTashkent();
   if (today < YT_EPISODES[0].date) return { ...YT_EPISODES[0], prelaunch: true }; // series not started
   let cur = YT_EPISODES[0];
   for(const ep of YT_EPISODES){
@@ -3488,7 +3506,7 @@ function getCurrentEpisode(){
 }
 
 function renderYoutube(){
-  const today   = new Date();
+  const today   = nowTashkent();
   const curEp   = getCurrentEpisode();
   const uploaded= YT_EPISODES.filter(e=>getYtStatus(e.id)==='uploaded').length;
   const filmed  = YT_EPISODES.filter(e=>getYtStatus(e.id)==='filmed').length;
@@ -3513,7 +3531,7 @@ function renderYoutube(){
   const statusColors={none:'#444',planned:'#C9A84C',filmed:'#4A90D9',uploaded:'#4CAF7D'};
   const statusLabels={none:'Not started',planned:'📝 Planned',filmed:'🎥 Filmed',uploaded:'🚀 Uploaded'};
   const nextEp = YT_EPISODES[curEp.ep] || null; // ep is 1-indexed, array is 0-indexed
-  const daysToLaunch = curEp.prelaunch ? Math.ceil((YT_EPISODES[0].date - new Date()) / 86400000) : 0;
+  const daysToLaunch = curEp.prelaunch ? Math.ceil((YT_EPISODES[0].date - nowTashkent()) / 86400000) : 0;
 
   document.getElementById('ytThisWeek').innerHTML= curEp.prelaunch ? `
     <div style="text-align:center;padding:20px 0;">
@@ -3591,7 +3609,7 @@ function showSec(id,tab){
   else renderAll();
 }
 function changeDay(n){ curDate=clamp(addDays(curDate,n)); renderAll(); }
-function goToday(){ curDate=clamp(new Date()); renderAll(); }
+function goToday(){ curDate=clamp(nowTashkent()); renderAll(); }
 function changeWeek(n){ wkOffset+=n; renderAll(); }
 function goThisWeek(){ wkOffset=0; renderAll(); }
 function changeMo(n){ curMonth=Math.max(5,Math.min(12,curMonth+n)); renderAll(); }
@@ -3610,7 +3628,7 @@ function logWeight() {
     document.getElementById('weightStatus').textContent = '⚠️ Valid kg kiriting';
     return;
   }
-  const key = dateKey(new Date());
+  const key = tashKey();
   weightState[key] = val;
   window._weightState = weightState;
   scheduleSave();
@@ -3819,7 +3837,7 @@ function renderBestDay() {
   const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const totals = [0,0,0,0,0,0,0], counts = [0,0,0,0,0,0,0];
   let d = new Date(START);
-  while (d <= new Date()) {
+  while (d <= nowTashkent()) {
     const key = dateKey(d);
     const tasks = state[key] || {};
     const done = Object.values(tasks).filter(Boolean).length;
@@ -3860,7 +3878,7 @@ function renderMonthCompare() {
 
   const months = [5,6,7,8,9,10,11,12];
   const labels = ['May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const now = new Date();
+  const now = nowTashkent();
   const colors = ['#8B6914','#C9A84C','#E07A30','#4CAF7D','#4A90D9','#B464C8','#40C0D0','#FF6080'];
 
   // For each month: {pct, isFuture, isCurrent}
@@ -3982,7 +4000,7 @@ function togglePlanForm() {
 
 // Compute real progress snapshot from current state for sending to AI
 function _buildProgressSnapshot() {
-  const today = new Date(); today.setHours(0,0,0,0);
+  const today = tashMidnight();
   let donePts=0, totalPts=0;
   let d=new Date(START);
   while(d<=today && d<=END){
@@ -4059,7 +4077,7 @@ async function generatePlan() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         goals, situation, vision,
-        startDate: new Date().toISOString().split('T')[0],
+        startDate: tashKey(),
         progress  // real data: completion %, prayer streak, weight, etc.
       })
     });
@@ -4098,7 +4116,7 @@ function clearAIPlan() {
 function getAITasksForDate(date) {
   if (!aiPlanState || !aiPlanState.quarters) return null;
   // Rule: past is sacred — never overwrite real past completion data with AI tasks
-  const today = new Date(); today.setHours(0,0,0,0);
+  const today = tashMidnight();
   if (date < today) return null;
   const dateStr = dateKey(date);
   const dow = date.getDay(); // 0=Sun, 6=Sat
@@ -4122,7 +4140,7 @@ function getAITasksForDate(date) {
 
 function getAIWeekInfo(date) {
   if (!aiPlanState || !aiPlanState.quarters) return null;
-  const _t = new Date(); _t.setHours(0,0,0,0);
+  const _t = tashMidnight();
   if (date < _t) return null; // no banner on past days
   const dateStr = dateKey(date);
   for (const quarter of aiPlanState.quarters) {
@@ -4316,27 +4334,28 @@ function renderRoadmap() {
 // ═══════════════════════════════════════════
 // QURAN SURAH SCHEDULE
 // ═══════════════════════════════════════════
+// An-Nas (114), Al-Falaq (113), Al-Ikhlas (112) already memorised — start from Al-Masad (111)
 const SURAH_SCHEDULE = [
-  { week:'2026-06-01', surah:'An-Nas (114)',      ayahs:6  },
-  { week:'2026-06-08', surah:'Al-Falaq (113)',    ayahs:5  },
-  { week:'2026-06-15', surah:'Al-Ikhlas (112)',   ayahs:4  },
-  { week:'2026-06-22', surah:'Al-Masad (111)',    ayahs:5  },
-  { week:'2026-06-29', surah:'An-Nasr (110)',     ayahs:3  },
-  { week:'2026-07-06', surah:'Al-Kafirun (109)',  ayahs:6  },
-  { week:'2026-07-13', surah:'Al-Kawthar (108)',  ayahs:3  },
-  { week:'2026-07-20', surah:"Al-Ma'un (107)",    ayahs:7  },
-  { week:'2026-07-27', surah:'Quraysh (106)',     ayahs:4  },
-  { week:'2026-08-03', surah:'Al-Fil (105)',      ayahs:5  },
-  { week:'2026-08-10', surah:'Al-Humazah (104)',  ayahs:9  },
-  { week:'2026-08-17', surah:"Al-'Asr (103)",     ayahs:3  },
-  { week:'2026-08-24', surah:'At-Takathur (102)', ayahs:8  },
-  { week:'2026-08-31', surah:"Al-Qari'ah (101)",  ayahs:11 },
+  { week:'2026-06-01', surah:'Al-Masad (111)',     ayahs:5  },
+  { week:'2026-06-08', surah:'An-Nasr (110)',      ayahs:3  },
+  { week:'2026-06-15', surah:'Al-Kafirun (109)',   ayahs:6  },
+  { week:'2026-06-22', surah:'Al-Kawthar (108)',   ayahs:3  },
+  { week:'2026-06-29', surah:"Al-Ma'un (107)",     ayahs:7  },
+  { week:'2026-07-06', surah:'Quraysh (106)',      ayahs:4  },
+  { week:'2026-07-13', surah:'Al-Fil (105)',       ayahs:5  },
+  { week:'2026-07-20', surah:'Al-Humazah (104)',   ayahs:9  },
+  { week:'2026-07-27', surah:"Al-'Asr (103)",      ayahs:3  },
+  { week:'2026-08-03', surah:'At-Takathur (102)',  ayahs:8  },
+  { week:'2026-08-10', surah:"Al-Qari'ah (101)",   ayahs:11 },
+  { week:'2026-08-17', surah:"Al-'Adiyat (100)",   ayahs:11 },
+  { week:'2026-08-24', surah:'Al-Zalzalah (99)',   ayahs:8  },
+  { week:'2026-08-31', surah:'Al-Bayyinah (98)',   ayahs:8  },
 ];
 
 function renderSurahSchedule() {
   const el = document.getElementById('surahSchedule');
   if (!el) return;
-  const today = new Date(Date.now());
+  const today = nowTashkent();
   const todayKey = dateKey(today);
 
   // Find current week's surah
