@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>My 2026 Life Plan</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23C9A84C'/><text x='50' y='72' text-anchor='middle' font-size='60' font-family='serif' fill='%2308080A'>🗓</text></svg>">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%23C9A84C'/><text x='50' y='72' text-anchor='middle' font-size='60' font-family='serif' fill='%2308080A'>🗓</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <style>
@@ -1954,6 +1956,7 @@ const MONTHS_FULL =['','January','February','March','April','May','June','July',
 const DAYS_FULL   =['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
 function renderAll() {
+  if (!_appInitialized) return; // never render before Firebase data is ready
   renderDaily();
   renderWeekly();
   renderMonthly();
@@ -3977,6 +3980,59 @@ function togglePlanForm() {
   document.getElementById('planGenBtn').textContent = isOpen ? '✨ Generate My Plan' : '✕ Cancel';
 }
 
+// Compute real progress snapshot from current state for sending to AI
+function _buildProgressSnapshot() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  let donePts=0, totalPts=0;
+  let d=new Date(START);
+  while(d<=today && d<=END){
+    const key=dateKey(d);
+    getTasksForDate(d).forEach(t=>{
+      totalPts+=t.pts||1;
+      if(getTask(key,t.id)) donePts+=t.pts||1;
+    });
+    d=addDays(d,1);
+  }
+  const completionRate = totalPts ? Math.round(donePts/totalPts*100) : 0;
+
+  // Prayer streak
+  let pStreak=0, pd=new Date(today);
+  while(pd>=START){
+    const pk=dateKey(pd);
+    const pp=prayerState[pk]||{};
+    const names=['fajr','zuhr','asr','maghrib','isha'];
+    if(names.every(n=>pp[n]&&pp[n]!=='missed')) pStreak++;
+    else break;
+    pd=addDays(pd,-1);
+  }
+
+  // Diet compliance
+  let dietDays=0, dietGood=0;
+  let dd=new Date(START);
+  while(dd<=today&&dd<=END){
+    const s=dietDayScore(dateKey(dd));
+    if(s>0){dietDays++;if(s===4)dietGood++;}
+    dd=addDays(dd,1);
+  }
+  const dietRate=dietDays?Math.round(dietGood/dietDays*100):0;
+
+  // Weight
+  const weightEntries=Object.entries(weightState||{}).sort();
+  const latestWeight=weightEntries.length?weightEntries[weightEntries.length-1][1]:null;
+
+  // YouTube
+  const ytUploaded=Object.values(ytState||{}).filter(v=>v==='uploaded').length;
+
+  // Savings (sum of all savings entries)
+  const totalSaved=Object.values(savingsState||{}).reduce((s,v)=>{
+    if(Array.isArray(v)) return s+v.reduce((a,e)=>a+(e.amount||0),0);
+    return s+(v.amount||0);
+  },0);
+
+  return { completionRate, prayerStreak:pStreak, dietCompliance:dietRate,
+           currentWeight:latestWeight, ytUploaded, savedAmount:totalSaved };
+}
+
 async function generatePlan() {
   const goals     = document.getElementById('planGoals').value.trim();
   const situation = document.getElementById('planSituation').value.trim();
@@ -3989,10 +4045,13 @@ async function generatePlan() {
   document.getElementById('planLoading').style.display = 'block';
   document.getElementById('planGenBtn').textContent    = '✨ Generate My Plan';
 
-  const msgs = ['Analysing your goals and situation…','Building 10-year vision…','Planning Summer quarter tasks…','Crafting weekly schedules…','Finalising your personal roadmap…'];
+  const msgs = ['Reading your progress data…','Building 10-year vision…','Planning Summer quarter tasks…','Crafting weekly schedules…','Finalising your personal roadmap…'];
   let mi = 0;
   const msgEl = document.getElementById('planLoadingMsg');
   const ticker = setInterval(() => { if (mi < msgs.length-1) msgEl.textContent = msgs[++mi]; }, 8000);
+
+  // Rule 2: read real progress before generating so AI knows where you actually are
+  const progress = _buildProgressSnapshot();
 
   try {
     const resp = await fetch(AI_BOT + '/generate-plan', {
@@ -4000,7 +4059,8 @@ async function generatePlan() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         goals, situation, vision,
-        startDate: new Date().toISOString().split('T')[0]
+        startDate: new Date().toISOString().split('T')[0],
+        progress  // real data: completion %, prayer streak, weight, etc.
       })
     });
     const data = await resp.json();
@@ -4037,6 +4097,9 @@ function clearAIPlan() {
 
 function getAITasksForDate(date) {
   if (!aiPlanState || !aiPlanState.quarters) return null;
+  // Rule: past is sacred — never overwrite real past completion data with AI tasks
+  const today = new Date(); today.setHours(0,0,0,0);
+  if (date < today) return null;
   const dateStr = dateKey(date);
   const dow = date.getDay(); // 0=Sun, 6=Sat
   for (const quarter of aiPlanState.quarters) {
@@ -4059,6 +4122,8 @@ function getAITasksForDate(date) {
 
 function getAIWeekInfo(date) {
   if (!aiPlanState || !aiPlanState.quarters) return null;
+  const _t = new Date(); _t.setHours(0,0,0,0);
+  if (date < _t) return null; // no banner on past days
   const dateStr = dateKey(date);
   for (const quarter of aiPlanState.quarters) {
     for (const month of (quarter.months || [])) {
@@ -4304,15 +4369,13 @@ function renderSurahSchedule() {
 }
 
 function init(){
-  loadDietFromCloud();
-  loadMoneyFromCloud();
-  loadPrayerFromCloud();
-  loadWorkoutFromCloud();
-  loadReflectFromCloud();
-  loadYtFromCloud();
+  // All data loading happens via Firebase onSnapshot (defined in the Firebase module above).
+  // _onFirebaseLoaded() fires when data is ready and does the first render.
+  // Nothing here should render — just set up background tasks.
+
   // Auto-save every 30 seconds if there are unsaved changes
   setInterval(() => {
-    if (unsavedChanges && typeof saveAllData === 'function') {
+    if (_appInitialized && unsavedChanges && typeof saveAllData === 'function') {
       saveAllData();
     }
   }, 30000);

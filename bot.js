@@ -1163,8 +1163,20 @@ app.post('/chat', async (req, res) => {
 
 // ── AI Plan Generator ─────────────────────────────────────────────────────────
 app.post('/generate-plan', async (req, res) => {
-  const { goals, situation, vision, startDate, currentQuarterOnly } = req.body;
+  const { goals, situation, vision, startDate, currentQuarterOnly, progress } = req.body;
   if (!process.env.OPENAI_API_KEY) return res.status(500).json({ error: 'OpenAI not configured' });
+
+  // Build a real-progress context block to personalise the plan
+  const progressCtx = progress ? `
+REAL PROGRESS DATA (use this to personalise — do NOT ignore):
+- Task completion rate so far: ${progress.completionRate}%
+- Prayer streak: ${progress.prayerStreak} consecutive days with all 5 prayers
+- Diet compliance: ${progress.dietCompliance}% of days with clean eating
+- Current weight: ${progress.currentWeight ? progress.currentWeight + 'kg' : 'not logged yet'} (target: 90kg)
+- YouTube episodes uploaded: ${progress.ytUploaded} of 24
+- Total savings: ${progress.savedAmount ? Math.round(progress.savedAmount).toLocaleString() + ' so\'m' : 'not logged'}
+` : '';
+
   try {
     const resp = await openai.chat.completions.create({
       model: 'gpt-4o',
@@ -1172,6 +1184,7 @@ app.post('/generate-plan', async (req, res) => {
       messages: [{
         role: 'system',
         content: `You are a life planning AI. Generate a complete, deeply personalized 2026 life plan as JSON.
+${progressCtx}
 
 OUTPUT THIS EXACT JSON SCHEMA (no extra fields):
 {
