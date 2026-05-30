@@ -1403,6 +1403,53 @@ hr{ border-color: rgba(201,168,76,0.07); }
     <div id="planQuarters"></div>
   </div>
 
+  <!-- ── Monthly Learning Sources ─────────────────────────────────────── -->
+  <div class="task-card" style="margin-top:14px;border-color:rgba(74,144,217,0.3);">
+    <div class="task-card-hdr" style="color:#4A90D9;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+      <span>📚 Monthly Study Plan</span>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span id="studyPlanMonthLabel" style="font-size:0.7rem;color:var(--muted);font-weight:400;"></span>
+        <button id="studyClearBtn" onclick="clearStudyPlan()" style="display:none;background:rgba(217,74,74,0.15);border:1px solid #D94A4A44;color:#D94A4A;padding:3px 10px;border-radius:5px;font-size:0.65rem;cursor:pointer;">🗑 Clear</button>
+      </div>
+    </div>
+    <div style="font-size:0.72rem;color:var(--muted);margin-bottom:10px;">
+      Paste video titles &amp; links. AI splits them into daily pairs — each pair becomes a study task in your Daily view.
+    </div>
+
+    <!-- Input area -->
+    <div id="studyInputArea">
+      <textarea id="studyRawText" rows="8"
+        style="width:100%;background:rgba(255,255,255,0.03);border:1px solid rgba(74,144,217,0.2);border-radius:8px;color:var(--text);padding:10px 12px;font-size:0.76rem;line-height:1.6;font-family:'DM Sans',sans-serif;resize:vertical;"
+        placeholder="Paste your video titles and links here.
+Each blank line = new study session (1 day).
+Example:
+
+YaTT ishlashidagi xatolar 6-DARS,
+Aylanmadan olinadigan soliqda xatolar 7-DARS.
+
+Korxonalar nega ОБНАЛ qiladi?,
+Jismoniy shaxslar daromadlarini deklaratsiyalash."></textarea>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap;">
+        <div style="flex:1;">
+          <label style="font-size:0.68rem;color:var(--muted);display:block;margin-bottom:3px;">Study starts from</label>
+          <input id="studyStartDate" type="date" style="background:rgba(255,255,255,0.04);border:1px solid rgba(74,144,217,0.2);border-radius:6px;color:var(--text);padding:5px 10px;font-size:0.76rem;font-family:'DM Sans',sans-serif;width:100%;">
+        </div>
+        <button onclick="planStudies()" style="margin-top:18px;background:linear-gradient(135deg,rgba(74,144,217,0.3),rgba(74,144,217,0.15));border:1px solid rgba(74,144,217,0.5);color:#4A90D9;padding:8px 16px;border-radius:8px;font-size:0.78rem;font-weight:600;cursor:pointer;white-space:nowrap;">
+          ✨ Plan My Studies
+        </button>
+      </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="studyLoading" style="display:none;text-align:center;padding:30px;">
+      <div style="font-size:1.5rem;margin-bottom:8px;">⏳</div>
+      <div style="font-size:0.8rem;color:var(--muted);" id="studyLoadingMsg">Parsing your topics…</div>
+    </div>
+
+    <!-- Result calendar -->
+    <div id="studyPlanDisplay" style="display:none;margin-top:4px;"></div>
+  </div>
+
   <!-- Empty state -->
   <div id="planEmpty">
     <div style="text-align:center;padding:60px 20px;color:var(--muted);">
@@ -1464,9 +1511,10 @@ window.saveAllData = async function() {
       workout: JSON.stringify(window._workoutState||{}),
       reflect: JSON.stringify(window._reflectState||{}),
       youtube: JSON.stringify(window._ytState     ||{}),
-      weight:   JSON.stringify(window._weightState   ||{}),
-      aiPlan:   window._aiPlanState ? JSON.stringify(window._aiPlanState) : null,
-      roadmap:  JSON.stringify(window._roadmapState ||{}),
+      weight:      JSON.stringify(window._weightState   ||{}),
+      aiPlan:      window._aiPlanState   ? JSON.stringify(window._aiPlanState)   : null,
+      roadmap:     JSON.stringify(window._roadmapState  ||{}),
+      studyPlan:   window._studyPlan     ? JSON.stringify(window._studyPlan)     : null,
       savedAt: nowTashkent().toISOString(),
     };
     await setDoc(USER_DOC_REF, payload);
@@ -1505,9 +1553,10 @@ function _applySnapshot(snap) {
   window._workoutState = JSON.parse(d.workout ||'{}');
   window._reflectState = JSON.parse(d.reflect ||'{}');
   window._ytState      = JSON.parse(d.youtube ||'{}');
-  window._weightState   = d.weight  ? JSON.parse(d.weight)  : {};
-  window._aiPlanState   = d.aiPlan  ? JSON.parse(d.aiPlan)  : null;
-  window._roadmapState  = d.roadmap ? JSON.parse(d.roadmap) : {};
+  window._weightState   = d.weight     ? JSON.parse(d.weight)     : {};
+  window._aiPlanState   = d.aiPlan     ? JSON.parse(d.aiPlan)     : null;
+  window._roadmapState  = d.roadmap    ? JSON.parse(d.roadmap)    : {};
+  window._studyPlan     = d.studyPlan  ? JSON.parse(d.studyPlan)  : null;
 
   const dot=document.getElementById('saveDot');
   const lbl=document.getElementById('saveLabel');
@@ -1605,6 +1654,7 @@ function scheduleSave() {
   if (typeof weightState   !== 'undefined') window._weightState   = weightState;
   if (typeof aiPlanState   !== 'undefined') window._aiPlanState   = aiPlanState;
   if (typeof roadmapState  !== 'undefined') window._roadmapState  = roadmapState;
+  if (typeof studyPlan     !== 'undefined') window._studyPlan     = studyPlan;
   setSaveStatus('saving', 'Unsaved — click Save!');
 }
 
@@ -1719,7 +1769,9 @@ function getFinanceVideoForDate(date) {
 function getTasksForDate(date) {
   // If AI plan is active, use AI-generated tasks
   const aiTasks = (typeof getAITasksForDate === 'function') ? getAITasksForDate(date) : null;
-  if (aiTasks && aiTasks.length > 0) return aiTasks;
+  if (aiTasks && aiTasks.length > 0) {
+    return (typeof mergeStudyTask === 'function') ? mergeStudyTask(date, aiTasks) : aiTasks;
+  }
 
   const t = getDayType(date);
   const vid = getFinanceVideoForDate(date);
@@ -1788,7 +1840,7 @@ function getTasksForDate(date) {
   ];
 
   // ── SUMMER weekday (May 30 – Aug 31) — 4 GOALS ONLY ─────────────────────
-  return [
+  const summerWeekday = [
     {id:'wk',cat:'work',     text:'Work — Logistics shift (01–09)',        time:'01:00', pts:1},
     {id:'q', cat:'quran',    text:'Quran + this week\'s surah (20 min)',   time:'09:00', pts:3},
     {id:'g1',cat:'gym',      text:'Gym — Cardio (1 hr fat loss)',          time:'09:30', pts:3},
@@ -1797,6 +1849,7 @@ function getTasksForDate(date) {
     {id:'sv',cat:'plan',     text:'Car fund: check savings progress',      time:'20:00', pts:2},
     {id:'pl',cat:'plan',     text:'Plan tomorrow\'s top 3 tasks',          time:'20:30', pts:2},
   ];
+  return (typeof mergeStudyTask === 'function') ? mergeStudyTask(date, summerWeekday) : summerWeekday;
 }
 
 const MONTHLY_GOALS = {
@@ -3971,6 +4024,7 @@ window._onFirebaseLoaded = function() {
   weightState   = window._weightState   || {};
   aiPlanState   = window._aiPlanState   || null;
   roadmapState  = window._roadmapState  || {};
+  studyPlan     = window._studyPlan     || null;
   if (_origLoaded) _origLoaded();
   renderWeightChart();
   renderBestDay();
@@ -3984,6 +4038,13 @@ window._onFirebaseLoaded = function() {
     document.getElementById('planSubtitle').textContent   = `Last generated: ${aiPlanState.generatedAt || 'saved'} · Tasks auto-populated into Daily view`;
     renderAIPlan();
     renderAll();
+  }
+  // Restore study plan UI if a saved study plan exists
+  if (studyPlan && typeof renderStudyPlan === 'function') {
+    document.getElementById('studyPlanDisplay').style.display = 'block';
+    document.getElementById('studyInputArea').style.display   = 'none';
+    document.getElementById('studyClearBtn').style.display    = 'inline-block';
+    renderStudyPlan();
   }
 };
 
@@ -4395,6 +4456,179 @@ function renderSurahSchedule() {
       📖 This week: <b>${SURAH_SCHEDULE[currentIdx].surah}</b> — ${SURAH_SCHEDULE[currentIdx].ayahs} ayahs
       &nbsp;·&nbsp; Week ${currentIdx+1} of ${SURAH_SCHEDULE.length}
     </div>` : ''}`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MONTHLY STUDY PLAN
+// ═══════════════════════════════════════════════════════════════════
+let studyPlan = null; // { month, monthSkill, sessions:[{date,sessionTitle,weekSkill,estimatedMinutes,items:[{title,url}]}] }
+
+// Pre-fill the start date input with today (Tashkent)
+(function() {
+  document.addEventListener('DOMContentLoaded', () => {
+    const inp = document.getElementById('studyStartDate');
+    if (inp) inp.value = tashKey();
+  });
+})();
+
+async function planStudies() {
+  const raw = document.getElementById('studyRawText').value.trim();
+  if (!raw) { alert('Please paste your video list first.'); return; }
+  const startDate = document.getElementById('studyStartDate').value || tashKey();
+
+  document.getElementById('studyInputArea').style.display  = 'none';
+  document.getElementById('studyPlanDisplay').style.display = 'none';
+  document.getElementById('studyLoading').style.display    = 'block';
+
+  const msgs = ['Parsing your topics…', 'Grouping into sessions…', 'Assigning to calendar days…', 'Almost done…'];
+  let mi = 0;
+  const msgEl = document.getElementById('studyLoadingMsg');
+  const ticker = setInterval(() => { if (mi < msgs.length-1) msgEl.textContent = msgs[++mi]; }, 5000);
+
+  try {
+    const resp = await fetch(AI_BOT + '/plan-studies', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        rawText: raw,
+        startDate,
+        month: startDate.slice(0,7)
+      })
+    });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+
+    clearInterval(ticker);
+    studyPlan = data.plan;
+    window._studyPlan = studyPlan;
+    scheduleSave();
+
+    document.getElementById('studyLoading').style.display     = 'none';
+    document.getElementById('studyInputArea').style.display   = 'none';
+    document.getElementById('studyPlanDisplay').style.display = 'block';
+    document.getElementById('studyClearBtn').style.display    = 'inline-block';
+    renderStudyPlan();
+    renderAll(); // refresh daily view with new study tasks
+  } catch(e) {
+    clearInterval(ticker);
+    document.getElementById('studyLoading').style.display   = 'none';
+    document.getElementById('studyInputArea').style.display = 'block';
+    alert('❌ Error: ' + e.message + '\n\nMake sure Render bot is running.');
+  }
+}
+
+function clearStudyPlan() {
+  if (!confirm('Clear the study plan? Study tasks will be removed from daily view.')) return;
+  studyPlan = null;
+  window._studyPlan = null;
+  scheduleSave();
+  document.getElementById('studyPlanDisplay').style.display = 'none';
+  document.getElementById('studyInputArea').style.display   = 'block';
+  document.getElementById('studyClearBtn').style.display    = 'none';
+  document.getElementById('studyPlanMonthLabel').textContent = '';
+  document.getElementById('studyRawText').value = '';
+  renderAll();
+}
+
+function getStudySessionForDate(date) {
+  if (!studyPlan || !studyPlan.sessions) return null;
+  const dk = dateKey(date);
+  return studyPlan.sessions.find(s => s.date === dk) || null;
+}
+
+function renderStudyPlan() {
+  const el = document.getElementById('studyPlanDisplay');
+  if (!el || !studyPlan) return;
+
+  document.getElementById('studyPlanMonthLabel').textContent =
+    studyPlan.monthSkill ? '📊 ' + studyPlan.monthSkill : '';
+
+  const today = tashKey();
+
+  // Group sessions by week (Mon–Sat)
+  const weekMap = {};
+  studyPlan.sessions.forEach(s => {
+    const d = new Date(s.date);
+    // Get Monday of this week
+    const dow = d.getUTCDay();
+    const diff = dow === 0 ? -6 : 1 - dow;
+    const mon = new Date(d); mon.setUTCDate(d.getUTCDate() + diff);
+    const wk = mon.toISOString().split('T')[0];
+    if (!weekMap[wk]) weekMap[wk] = { mon, skill: s.weekSkill, sessions: [] };
+    weekMap[wk].sessions.push(s);
+  });
+
+  const done  = studyPlan.sessions.filter(s => s.date < today).length;
+  const total = studyPlan.sessions.length;
+
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:8px 12px;background:rgba(74,144,217,0.06);border:1px solid rgba(74,144,217,0.15);border-radius:8px;">
+      <div style="font-size:0.72rem;color:var(--muted);flex:1;">${total} study sessions planned</div>
+      <div style="font-size:0.85rem;font-weight:700;color:#4A90D9;">${done}/${total} done</div>
+    </div>
+    ${Object.entries(weekMap).map(([wk, wdata]) => {
+      const monLabel = new Date(wdata.mon);
+      return `
+      <div style="margin-bottom:14px;">
+        <div style="font-size:0.68rem;font-weight:700;color:#4A90D9;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;display:flex;align-items:center;gap:8px;">
+          <span>Week of ${MONTHS_SHORT[monLabel.getUTCMonth()+1]} ${monLabel.getUTCDate()}</span>
+          <span style="background:rgba(74,144,217,0.1);border:1px solid rgba(74,144,217,0.2);padding:2px 8px;border-radius:10px;font-weight:600;font-size:0.62rem;text-transform:none;letter-spacing:0;">${wdata.skill}</span>
+        </div>
+        ${wdata.sessions.map(s => {
+          const isPast = s.date < today;
+          const isToday = s.date === today;
+          const mins = s.estimatedMinutes || 90;
+          return `
+          <div style="padding:8px 12px;border-radius:8px;margin-bottom:5px;
+            background:${isToday ? 'rgba(74,144,217,0.1)' : isPast ? 'rgba(76,175,125,0.05)' : 'rgba(255,255,255,0.02)'};
+            border:1px solid ${isToday ? 'rgba(74,144,217,0.4)' : isPast ? 'rgba(76,175,125,0.2)' : 'rgba(255,255,255,0.05)'};">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+              <div style="font-size:0.62rem;color:${isToday?'#4A90D9':isPast?'var(--green)':'var(--muted)'};font-weight:700;min-width:40px;">${s.date.slice(5)}</div>
+              <div style="font-size:0.76rem;color:var(--text);flex:1;font-weight:${isToday?'600':'400'}">${s.sessionTitle}</div>
+              <div style="font-size:0.6rem;color:var(--muted);white-space:nowrap;">${isPast?'✅':isToday?'▶ Today':''}${mins>0?' · '+mins+'m':''}</div>
+            </div>
+            <div style="padding-left:48px;">
+              ${s.items.map(item => `
+              <div style="display:flex;align-items:center;gap:6px;padding:2px 0;">
+                <div style="width:4px;height:4px;border-radius:50%;background:#4A90D9;flex-shrink:0;"></div>
+                <div style="font-size:0.68rem;color:var(--muted);flex:1;">${item.title}</div>
+                ${item.url ? `<a href="${item.url}" target="_blank" style="font-size:0.6rem;color:#4A90D9;text-decoration:none;white-space:nowrap;flex-shrink:0;">▶ Watch</a>` : ''}
+              </div>`).join('')}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    }).join('')}
+    <button onclick="document.getElementById('studyInputArea').style.display='block';document.getElementById('studyPlanDisplay').style.display='none';"
+      style="width:100%;padding:8px;background:rgba(74,144,217,0.08);border:1px solid rgba(74,144,217,0.2);border-radius:8px;color:#4A90D9;font-size:0.72rem;cursor:pointer;margin-top:4px;">
+      + Add more topics
+    </button>`;
+}
+
+// Inject study task into getTasksForDate result
+// Called after the base tasks are determined
+function mergeStudyTask(date, baseTasks) {
+  const session = getStudySessionForDate(date);
+  if (!session) return baseTasks;
+  const firstUrl = session.items.find(i => i.url)?.url || null;
+  const studyTask = {
+    id:   'study',
+    cat:  'finance',
+    text: `📚 Study: ${session.sessionTitle}`,
+    time: '11:00',
+    pts:  3,
+    url:  firstUrl,
+    studyItems: session.items // extra for tooltip/detail
+  };
+  // Replace any existing 'study' task, otherwise add after brokerage slot
+  const filtered = baseTasks.filter(t => t.id !== 'study');
+  // Insert after 'br' (brokerage) task if present, else append
+  const brIdx = filtered.findIndex(t => t.id === 'br');
+  if (brIdx >= 0) {
+    filtered.splice(brIdx + 1, 0, studyTask);
+    return filtered;
+  }
+  return [...filtered, studyTask];
 }
 
 function init(){

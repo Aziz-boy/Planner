@@ -1319,6 +1319,64 @@ app.post('/unsubscribe', (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Study Plan Generator ──────────────────────────────────────────────────────
+// Parses a freeform paste of video titles/links into daily study sessions.
+// Each blank-line-separated group = one session assigned to the next study day.
+app.post('/plan-studies', async (req, res) => {
+  const { rawText, startDate, month } = req.body;
+  if (!rawText) return res.status(400).json({ error: 'rawText required' });
+  if (!process.env.OPENAI_API_KEY) return res.status(500).json({ error: 'OpenAI not configured' });
+
+  try {
+    const prompt = `You are a study planner. Parse the following freeform list of video topics/links into daily study sessions.
+
+RAW TEXT:
+"""
+${rawText.trim()}
+"""
+
+RULES:
+1. Groups separated by blank lines = one session (typically 1-2 videos per session)
+2. Assign sessions to consecutive weekdays starting from ${startDate || 'today'}, skipping Sundays (day off)
+3. If a line contains a YouTube URL, extract it as the "url" for that item
+4. Clean up titles: remove trailing commas, fix formatting
+5. DO NOT treat individual videos as goals — they are just watch tasks
+6. For each week (Mon-Sat), generate ONE "weekSkill" = brief skill label (e.g. "Tax compliance", "Brokerage basics")
+7. For the whole batch, generate ONE "monthSkill" = overall knowledge area
+
+OUTPUT THIS EXACT JSON (no extra text):
+{
+  "month": "${month || new Date().toISOString().slice(0,7)}",
+  "monthSkill": "short overall skill name",
+  "sessions": [
+    {
+      "date": "YYYY-MM-DD",
+      "sessionTitle": "Short combined title of the pair",
+      "weekSkill": "skill for this week",
+      "estimatedMinutes": 90,
+      "items": [
+        { "title": "clean video title", "url": "https://... or null" },
+        { "title": "clean video title", "url": "https://... or null" }
+      ]
+    }
+  ]
+}`;
+
+    const resp = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      response_format: { type: 'json_object' },
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 2000,
+    });
+
+    const plan = JSON.parse(resp.choices[0].message.content);
+    res.json({ plan });
+  } catch(e) {
+    console.error('plan-studies error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`\n🤖 Life Planner Bot AI Edition`);
   console.log(`🌐 Server: http://localhost:${PORT}`);
