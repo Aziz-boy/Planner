@@ -561,8 +561,62 @@ ${isLawSchool ? `🎓 <b>LAW SCHOOL BLOCK (Sept–)</b>
 // Daily full schedule — midnight Tashkent
 cron.schedule('0 0 * * *', () => remind(getDailySchedule()), { timezone: 'Asia/Tashkent' });
 
-// Motivational quote every 3 hours
-cron.schedule('0 0,3,6,9,12,15,18,21 * * *', () => remind(MOTIVE), { timezone: 'Asia/Tashkent' });
+let lastRoast = MOTIVE; // cache last roast for push notification
+
+// AI roast motivation every 3 hours — reads Firebase, personalises the burn
+async function getAIRoast() {
+  if (!process.env.OPENAI_API_KEY) return MOTIVE; // fallback if no OpenAI
+  try {
+    const data = await readFirebaseData();
+    const today = getTashkentDate();
+    const todayTasks = data?.tasks?.[today] || {};
+    const doneTasks = Object.keys(todayTasks).filter(k => todayTasks[k]).length;
+    const totalTasks = Object.keys(todayTasks).length;
+    const hour = new Date(Date.now() + 5*3600*1000).getUTCHours();
+
+    // Gather some context for personalisation
+    const pToday = data?.prayer?.[today] || {};
+    const prayersDone = ['fajr','zuhr','asr','maghrib','isha'].filter(p => pToday[p] && pToday[p] !== 'missed').length;
+
+    const resp = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [{
+        role: 'user',
+        content: `You are a brutally honest, tough-love coach for Azizbek (25, Tashkent).
+
+PERSONAL CONTEXT (use this to roast him hard and personally):
+- His girlfriend Parvina left him because he was fat, indecisive, and broke
+- He weighs 105kg and wants to get to 90kg
+- He works a night shift 01:00-09:00, so mornings are precious
+- His goals: lose weight, memorise Quran, launch YouTube series, prep for law school, master finance/brokerage
+- Right now it is ${hour}:00 in Tashkent
+- Today he has completed ${doneTasks} out of ${totalTasks} tasks
+- Prayers done today: ${prayersDone}/5
+
+INSTRUCTIONS:
+- Write ONE brutal, personal motivational message (3–5 sentences max)
+- Mention Parvina if it fits naturally — not every time, but when the situation calls for it
+- Reference his actual situation (weight, time, tasks done/missed) to make it specific
+- Be harsh like a tough big brother, not a therapist
+- Mix Uzbek/Tajik words naturally (Bismillah, birodar, etc.)
+- No generic motivational poster quotes — make it STING
+- End with one sharp action he should do RIGHT NOW
+- Use emojis sparingly (1–2 max)`
+      }],
+      max_tokens: 200,
+    });
+    return resp.choices[0].message.content;
+  } catch(e) {
+    console.error('roast error:', e.message);
+    return MOTIVE; // fallback to static
+  }
+}
+
+cron.schedule('0 0,3,6,9,12,15,18,21 * * *', async () => {
+  const roast = await getAIRoast();
+  lastRoast = roast;
+  tg('💥 ' + roast);
+}, { timezone: 'Asia/Tashkent' });
 
 // Daily AI Morning Briefing — 09:05 Tashkent (automatically fires /today logic)
 cron.schedule('5 9 * * *', async () => {
@@ -753,8 +807,9 @@ bot.onText(/\/start/, () => {
 
 bot.onText(/\/schedule/, () => remind(getDailySchedule()));
 
-bot.onText(/\/motive/, () => {
-  bot.sendMessage(CHAT_ID, MOTIVE, {
+bot.onText(/\/motive/, async () => {
+  const roast = await getAIRoast();
+  bot.sendMessage(CHAT_ID, '💥 ' + roast, {
     parse_mode: 'HTML',
     reply_markup: {
       inline_keyboard: [[
@@ -1122,7 +1177,7 @@ bot.on('callback_query', (query) => {
       });
       return;
     }
-    push('💎 Motivation', MOTIVE.replace(/<[^>]+>/g, ''));
+    push('💥 Motivation', lastRoast.replace(/<[^>]+>/g, ''));
     bot.answerCallbackQuery(query.id, { text: `✅ Sent to ${count} browser${count > 1 ? 's' : ''}!` });
   }
 });
