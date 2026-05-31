@@ -1398,6 +1398,36 @@ OUTPUT EXACTLY THIS JSON SCHEMA:
   }
 });
 
+// ── Week AI Summarizer ────────────────────────────────────────────────────────
+app.post('/summarize-week', async (req, res) => {
+  const { days } = req.body; // [{date, done:[taskTexts]}]
+  if (!days?.length) return res.status(400).json({ error: 'days required' });
+  if (!process.env.OPENAI_API_KEY) return res.status(500).json({ error: 'OpenAI not configured' });
+  try {
+    const dayLines = days.map(d => `${d.date}: ${d.done.join(', ')}`).join('\n');
+    const resp = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      response_format: { type: 'json_object' },
+      messages: [{ role: 'user', content: `Summarize this week's completed tasks for Azizbek (Tashkent, goals: weight loss, Quran, YouTube FK series, law school prep, brokerage/finance).
+
+COMPLETED TASKS:
+${dayLines}
+
+Output JSON:
+{
+  "summary": "2-3 sentence plain English summary of what was achieved this week",
+  "skills": ["3-5 short skill/knowledge labels gained"],
+  "highlights": ["2-3 specific achievements worth noting"]
+}` }],
+      max_tokens: 400,
+    });
+    const data = JSON.parse(resp.choices[0].message.content);
+    res.json(data);
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`\n🤖 Life Planner Bot AI Edition`);
   console.log(`🌐 Server: http://localhost:${PORT}`);
