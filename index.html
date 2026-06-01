@@ -889,7 +889,7 @@ hr{ border-color: rgba(201,168,76,0.07); }
   </div>
 
   <!-- BOTTOM ROW: Money + Diet + Goals -->
-  <div id="dashBottom" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
+  <div id="dashBottom" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:16px;">
     <div class="task-card">
       <div class="task-card-hdr" style="color:var(--gold)"><i class="fa-solid fa-coins" style="margin-right:6px;"></i>Money Today</div>
       <div id="dashMoney"></div>
@@ -902,6 +902,27 @@ hr{ border-color: rgba(201,168,76,0.07); }
       <div class="task-card-hdr" style="color:var(--gold)"><i class="fa-solid fa-chart-line" style="margin-right:6px;"></i>Top Goals</div>
       <div id="dashGoals"></div>
     </div>
+  </div>
+
+  <!-- WEIGHT PROGRESS -->
+  <div class="task-card" id="dashWeightCard" style="border-top:3px solid #4CAF7D;">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+      <div class="task-card-hdr" style="color:#4CAF7D;margin-bottom:0;">⚖️ Weight Journey · 105 → 90 kg</div>
+      <button onclick="navTo('tracker')" style="font-size:0.65rem;color:#4CAF7D;background:rgba(76,175,125,0.1);border:1px solid rgba(76,175,125,0.25);border-radius:6px;padding:3px 10px;cursor:pointer;">Full chart →</button>
+    </div>
+
+    <!-- Progress bar -->
+    <div id="dashWeightProgress"></div>
+
+    <!-- Quick log -->
+    <div style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap;">
+      <input id="dashWeightInput" type="number" step="0.1" min="50" max="200" placeholder="Today's weight (kg)"
+        style="flex:1;min-width:120px;background:rgba(255,255,255,0.04);border:1px solid rgba(76,175,125,0.25);border-radius:8px;color:var(--text);padding:7px 12px;font-size:0.82rem;font-family:'DM Sans',sans-serif;">
+      <input id="dashCalInput" type="number" min="0" max="5000" placeholder="Calories burned"
+        style="flex:1;min-width:120px;background:rgba(255,255,255,0.04);border:1px solid rgba(76,175,125,0.25);border-radius:8px;color:var(--text);padding:7px 12px;font-size:0.82rem;font-family:'DM Sans',sans-serif;">
+      <button onclick="logWeightFromDash()" style="background:linear-gradient(135deg,rgba(76,175,125,0.3),rgba(76,175,125,0.15));border:1px solid rgba(76,175,125,0.4);color:#4CAF7D;padding:7px 16px;border-radius:8px;font-size:0.8rem;font-weight:600;cursor:pointer;white-space:nowrap;">+ Log</button>
+    </div>
+    <div id="dashWeightStatus" style="font-size:0.7rem;color:var(--muted);margin-top:5px;min-height:16px;"></div>
   </div>
 </div>
 
@@ -3597,6 +3618,9 @@ function renderDashboard(){
       </div>
     </div>`;
   }).join('');
+
+  // Weight card
+  if (typeof renderDashWeightCard === 'function') renderDashWeightCard();
 }
 
 // ═══════════════════════════════════════════
@@ -3870,7 +3894,14 @@ function changeMo(n){ curMonth=Math.max(5,Math.min(12,curMonth+n)); renderAll();
 // ═══════════════════════════════════════════
 // BODY WEIGHT TRACKER
 // ═══════════════════════════════════════════
-let weightState = {}; // { 'YYYY-MM-DD': 103.5 }
+let weightState = {}; // { 'YYYY-MM-DD': 103.5 } or { 'YYYY-MM-DD': {w:103.5, cal:450} }
+
+// Helpers to read weight/calories regardless of format (number vs object)
+function _wGet(key)   { const v = weightState[key]; return v && typeof v === 'object' ? v.w   : (v || null); }
+function _calGet(key) { const v = weightState[key]; return v && typeof v === 'object' ? v.cal : null; }
+function _wSet(key, w, cal) {
+  weightState[key] = { w, cal: cal || _calGet(key) || null };
+}
 
 function logWeight() {
   const val = parseFloat(document.getElementById('weightInput').value);
@@ -3879,13 +3910,103 @@ function logWeight() {
     return;
   }
   const key = tashKey();
-  weightState[key] = val;
+  _wSet(key, val, null);
   window._weightState = weightState;
   scheduleSave();
   document.getElementById('weightInput').value = '';
   document.getElementById('weightStatus').textContent = `✅ ${val} kg saqlandi`;
   if (navigator.vibrate) navigator.vibrate(30);
   renderWeightChart();
+  renderDashWeightCard();
+}
+
+function logWeightFromDash() {
+  const wVal = parseFloat(document.getElementById('dashWeightInput').value);
+  const cVal = parseInt(document.getElementById('dashCalInput').value) || null;
+  const st   = document.getElementById('dashWeightStatus');
+  if (!wVal && !cVal) { st.textContent = '⚠️ Enter weight or calories'; return; }
+  const key  = tashKey();
+  const existing = _wGet(key);
+  _wSet(key, wVal || existing || null, cVal);
+  window._weightState = weightState;
+  scheduleSave();
+  document.getElementById('dashWeightInput').value = '';
+  document.getElementById('dashCalInput').value = '';
+  if (navigator.vibrate) navigator.vibrate(30);
+  const parts = [];
+  if (wVal) parts.push(wVal + ' kg');
+  if (cVal) parts.push(cVal + ' cal burned');
+  st.style.color = '#4CAF7D';
+  st.textContent = '✅ ' + parts.join(' · ') + ' saved!';
+  setTimeout(() => { st.textContent = ''; st.style.color = ''; }, 3000);
+  renderWeightChart();
+  renderDashWeightCard();
+}
+
+function renderDashWeightCard() {
+  const el = document.getElementById('dashWeightProgress');
+  if (!el) return;
+
+  const START_W = 105, TARGET = 90;
+  const entries = Object.entries(weightState)
+    .map(([k]) => ({ k, w: _wGet(k), cal: _calGet(k) }))
+    .filter(e => e.w)
+    .sort((a,b) => a.k.localeCompare(b.k));
+
+  const latest    = entries.length ? entries[entries.length-1] : null;
+  const currentW  = latest?.w ?? START_W;
+  const lost      = Math.max(0, START_W - currentW);
+  const toGo      = Math.max(0, currentW - TARGET);
+  const pct       = Math.min(100, Math.round(lost / (START_W - TARGET) * 100));
+  const todayKey  = tashKey();
+  const todayCal  = _calGet(todayKey);
+  const todayW    = _wGet(todayKey);
+
+  // Trend: compare last 2 entries
+  let trendHTML = '';
+  if (entries.length >= 2) {
+    const diff = currentW - entries[entries.length-2].w;
+    const arrow = diff < 0 ? `<span style="color:#4CAF7D;">▼ ${Math.abs(diff).toFixed(1)} kg</span>` :
+                  diff > 0 ? `<span style="color:#D94A4A;">▲ ${diff.toFixed(1)} kg</span>` :
+                  `<span style="color:var(--muted);">─ no change</span>`;
+    trendHTML = `<span style="font-size:0.7rem;"> ${arrow} since last log</span>`;
+  }
+
+  el.innerHTML = `
+    <!-- Stats row -->
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+      <div style="text-align:center;min-width:60px;">
+        <div style="font-family:'Playfair Display',serif;font-size:1.4rem;color:#4CAF7D;font-weight:700;">${currentW}<span style="font-size:0.7rem;font-weight:400;"> kg</span></div>
+        <div style="font-size:0.6rem;color:var(--muted);">Current${todayW?' ✓':''}</div>
+      </div>
+      <div style="text-align:center;min-width:60px;">
+        <div style="font-family:'Playfair Display',serif;font-size:1.4rem;color:${lost>0?'#C9A84C':'var(--muted)'};font-weight:700;">${lost.toFixed(1)}<span style="font-size:0.7rem;font-weight:400;"> kg</span></div>
+        <div style="font-size:0.6rem;color:var(--muted);">Lost</div>
+      </div>
+      <div style="text-align:center;min-width:60px;">
+        <div style="font-family:'Playfair Display',serif;font-size:1.4rem;color:#E07A30;font-weight:700;">${toGo.toFixed(1)}<span style="font-size:0.7rem;font-weight:400;"> kg</span></div>
+        <div style="font-size:0.6rem;color:var(--muted);">To go</div>
+      </div>
+      ${todayCal ? `<div style="text-align:center;min-width:60px;">
+        <div style="font-family:'Playfair Display',serif;font-size:1.4rem;color:#4A90D9;font-weight:700;">${todayCal}<span style="font-size:0.7rem;font-weight:400;"> cal</span></div>
+        <div style="font-size:0.6rem;color:var(--muted);">Burned today</div>
+      </div>` : ''}
+      <div style="flex:1;display:flex;align-items:center;">${trendHTML}</div>
+    </div>
+
+    <!-- Progress bar: 105 → 90 -->
+    <div style="margin-bottom:6px;">
+      <div style="display:flex;justify-content:space-between;font-size:0.62rem;color:var(--muted);margin-bottom:4px;">
+        <span>🏁 105 kg (start)</span>
+        <span style="color:#4CAF7D;font-weight:700;">${pct}% complete</span>
+        <span>🎯 90 kg (goal)</span>
+      </div>
+      <div style="height:10px;background:var(--dark4);border-radius:5px;overflow:hidden;position:relative;">
+        <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#4CAF7D,#80E0A0);border-radius:5px;transition:width .6s;"></div>
+        ${pct > 5 ? `<div style="position:absolute;left:${Math.min(pct,92)}%;top:50%;transform:translate(-50%,-50%);font-size:0.55rem;color:#000;font-weight:700;">${pct}%</div>` : ''}
+      </div>
+      <div style="font-size:0.6rem;color:var(--muted);margin-top:3px;text-align:right;">${entries.length} weigh-ins logged</div>
+    </div>`;
 }
 
 function renderWeightChart() {
@@ -3897,7 +4018,7 @@ function renderWeightChart() {
   ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
   const W = canvas.offsetWidth, H = 180;
 
-  const entries = Object.entries(weightState).sort((a,b) => a[0].localeCompare(b[0]));
+  const entries = Object.keys(weightState).sort().map(k => [k, _wGet(k)]).filter(e => e[1]);
   const statsEl = document.getElementById('weightStats');
 
   ctx.clearRect(0, 0, W, H);
@@ -4219,6 +4340,7 @@ window._onFirebaseLoaded = function() {
   customTasks   = window._customTasks   || {};
   if (_origLoaded) _origLoaded();
   renderWeightChart();
+  renderDashWeightCard();
   renderBestDay();
   renderMonthCompare();
   renderReflectChart();
@@ -4294,8 +4416,8 @@ function _buildProgressSnapshot() {
   const dietRate=dietDays?Math.round(dietGood/dietDays*100):0;
 
   // Weight
-  const weightEntries=Object.entries(weightState||{}).sort();
-  const latestWeight=weightEntries.length?weightEntries[weightEntries.length-1][1]:null;
+  const weightEntries=Object.keys(weightState||{}).sort();
+  const latestWeight=weightEntries.length?_wGet(weightEntries[weightEntries.length-1]):null;
 
   // YouTube
   const ytUploaded=Object.values(ytState||{}).filter(v=>v==='uploaded').length;
