@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "planner",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "-p", "5500", "/Users/Azizboy/Desktop/planner"],
+      "port": 5500
+    }
+  ]
+}
