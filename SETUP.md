@@ -41,6 +41,8 @@ npm start
 3. Connect your GitHub repo
 4. Render auto-detects `render.yaml`
 5. Add all environment variables in Render dashboard:
+   - `OPENAI_API_KEY`
+   - `FIREBASE_SERVICE_ACCOUNT` (base64 JSON from Step 3)
    - `TELEGRAM_BOT_TOKEN`
    - `TELEGRAM_CHAT_ID`
    - `VAPID_PUBLIC_KEY`
@@ -49,22 +51,24 @@ npm start
    - `PLANNER_URL` → your Netlify URL (e.g. `https://yoursite.netlify.app`)
 6. Deploy → copy your Render URL (e.g. `https://life-planner-bot.onrender.com`)
 
-## Step 6 — Update index.html
+## Step 6 — Confirm the website API address
 
-In `index.html` find this line near the bottom:
+The frontend uses one shared API address for AI Coach, AI Plan, study planning, and summaries. It is defined in:
 
 ```js
-const BOT_SERVER = 'https://your-bot-server.onrender.com';
+assets/js/config.js
 ```
 
-Replace with your actual Render URL, then redeploy to Netlify.
+If Render gives you a different service URL, update `configuredBase` in that file, then redeploy the website. Do not add separate URLs for individual AI features.
+
+Verify deployment health at `https://YOUR-SERVICE.onrender.com/health`. The JSON should show `"status":"ok"` and `"openai":true`.
 
 ## Step 7 — Enable browser notifications
 
 1. Open your Netlify planner site
-2. Click **🔔 Enable Reminders** button (bottom-right corner)
+2. Click the **🔔** button in the top header
 3. Allow notifications when browser asks
-4. Button turns green → ✅ Reminders ON
+4. The bell turns green → ✅ Reminders ON
 
 ## ⚠️ Render Free Tier Note
 
@@ -104,3 +108,18 @@ Render free tier spins down after 15 min of inactivity. To keep it alive 24/7:
 - `/prayers` — Tashkent prayer times
 - `/status` — Bot status + push subscription count
 - `/chatid` — Shows your chat ID
+
+## Project structure
+
+```text
+assets/css/              Website styling
+assets/js/app.js         Planner screens and trackers
+assets/js/ai-coach.js    AI Coach panel
+assets/js/firebase-storage.js  Cloud sync and local fallback
+src/services/            OpenAI, Firebase Admin, and push services
+src/app.js               Telegram schedules, commands, and HTTP routes
+bot.js                   Small server entry point
+test/                    Regression tests
+```
+
+Run `npm run check` for source checks and `npm test` for regression tests before deploying.

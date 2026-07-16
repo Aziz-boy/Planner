@@ -7,8 +7,8 @@ self.addEventListener('push', event => {
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
-      icon: '/icon-192.png',
-      badge: '/icon-192.png',
+      icon: '/assets/icons/planner.svg',
+      badge: '/assets/icons/planner.svg',
       vibrate: [200, 100, 200],
       requireInteraction: false,
       tag: 'life-planner-reminder'
