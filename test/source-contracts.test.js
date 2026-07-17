@@ -37,6 +37,15 @@ test('server exposes health state and accepts planner context for the coach', ()
   assert.match(server, /express\.json\(\{ limit: '256kb' \}\)/);
 });
 
+test('Telegram works with both CommonJS and named/default package exports', () => {
+  const telegramModule = require('node-telegram-bot-api');
+  const TelegramBot = telegramModule.TelegramBot || telegramModule.default || telegramModule;
+  assert.equal(typeof TelegramBot, 'function');
+
+  const server = read('src/app.js');
+  assert.match(server, /telegramModule\.TelegramBot \|\| telegramModule\.default \|\| telegramModule/);
+});
+
 test('browser reminders register the service worker and persist subscriptions', () => {
   const notifications = read('assets/js/notifications.js');
   assert.match(notifications, /serviceWorker\.register\('\/sw\.js'\)/);
