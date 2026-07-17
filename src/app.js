@@ -1,4 +1,5 @@
-const TelegramBot = require('node-telegram-bot-api');
+const telegramModule = require('node-telegram-bot-api');
+const TelegramBot = telegramModule.TelegramBot || telegramModule.default || telegramModule;
 const cron        = require('node-cron');
 const express     = require('express');
 const cors        = require('cors');
@@ -36,6 +37,9 @@ const TOKEN   = config.telegramToken;
 const CHAT_ID = config.telegramChatId;
 const PORT    = config.port;
 const telegramEnabled = Boolean(TOKEN && CHAT_ID);
+if (telegramEnabled && typeof TelegramBot !== 'function') {
+  throw new TypeError('The Telegram client constructor could not be loaded.');
+}
 const bot = telegramEnabled
   ? new TelegramBot(TOKEN, { polling: true })
   : {
