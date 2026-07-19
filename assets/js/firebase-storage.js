@@ -35,6 +35,16 @@ let saveInFlight = null;
 
 window._firebaseModuleStarted = true;
 
+function notifyPlannerLoaded(loadInfo) {
+  try {
+    window._onFirebaseLoaded?.(loadInfo);
+  } catch (error) {
+    // A broken optional view must never hide data that already loaded safely.
+    console.error('Planner data loaded, but a view refresh failed:', error);
+    window._setPlannerSaveStatus?.('saved', 'Cloud synced — one view needs a refresh');
+  }
+}
+
 function decodeField(field, value) {
   const fallback = NULLABLE_FIELDS.has(field) ? null : {};
   if (value == null || value === '') return fallback;
@@ -53,7 +63,7 @@ function decodeField(field, value) {
 function applySnapshot(snapshot) {
   receivedSnapshot = true;
   if (!snapshot.exists()) {
-    window._onFirebaseLoaded?.({ source: 'cloud-empty' });
+    notifyPlannerLoaded({ source: 'cloud-empty' });
     return;
   }
   if (snapshot.metadata.hasPendingWrites && window._appInitialized) return;
@@ -75,7 +85,7 @@ function applySnapshot(snapshot) {
     quiet: true,
   });
 
-  window._onFirebaseLoaded?.({
+  notifyPlannerLoaded({
     source: snapshot.metadata.fromCache ? 'cache' : 'cloud',
     savedAt: data.savedAt || null,
   });
@@ -86,7 +96,7 @@ window.saveAllData = function saveAllData() {
   const button = document.getElementById('globalSaveBtn');
   if (button) {
     button.disabled = true;
-    button.textContent = 'Saving...';
+    button.textContent = 'Syncing…';
   }
   window._setPlannerSaveStatus?.('saving', 'Saving to cloud...');
 
@@ -100,7 +110,7 @@ window.saveAllData = function saveAllData() {
       if (button) {
         button.style.background = '#4CAF7D';
         button.style.color = '#000';
-        button.textContent = '✓ Saved!';
+        button.textContent = '✓ Synced';
       }
     } catch (error) {
       console.error('Cloud save failed:', error);
@@ -116,7 +126,7 @@ window.saveAllData = function saveAllData() {
         setTimeout(() => {
           button.style.background = '';
           button.style.color = '';
-          button.textContent = '💾 Save Progress';
+          button.textContent = '↻ Sync now';
         }, 2000);
       }
       saveInFlight = null;
@@ -133,12 +143,12 @@ onSnapshot(
   (error) => {
     console.error('Firestore listener failed:', error);
     window._setPlannerSaveStatus?.('error', 'Cloud sync unavailable — using local data');
-    if (!receivedSnapshot) window._onFirebaseLoaded?.({ source: 'local-fallback' });
+    if (!receivedSnapshot) notifyPlannerLoaded({ source: 'local-fallback' });
   },
 );
 
 setTimeout(() => {
   if (receivedSnapshot) return;
   window._setPlannerSaveStatus?.('error', 'Cloud is slow — using local data');
-  window._onFirebaseLoaded?.({ source: 'local-fallback' });
+  notifyPlannerLoaded({ source: 'local-fallback' });
 }, 8000);

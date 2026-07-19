@@ -18,9 +18,42 @@ test('all AI screens use the shared API client', () => {
 
 test('cloud sync has a local fallback and merge-safe writes', () => {
   const storage = read('assets/js/firebase-storage.js');
+  const app = read('assets/js/app.js');
   assert.match(storage, /setDoc\(plannerDoc, payload, \{ merge: true \}\)/);
   assert.match(storage, /Cloud is slow — using local data/);
   assert.match(storage, /decodeField/);
+  assert.match(storage, /notifyPlannerLoaded/);
+  assert.match(app, /Saving automatically/);
+  assert.match(app, /window\._saveLocalBackup\?\.\(\{ markClean: false, quiet: true \}\)/);
+});
+
+test('legacy task categories cannot crash planner rendering', () => {
+  const app = read('assets/js/app.js');
+  assert.match(app, /function getCategoryMeta/);
+  assert.match(app, /function renderSafely/);
+  assert.match(app, /if \(!raw\) return ''/);
+  assert.match(app, /\['weekly', renderWeekly\]/);
+  assert.doesNotMatch(app, /const c\s*=\s*CATS\[t\.cat\]/);
+});
+
+test('focus experience reduces the main navigation and supports minimum days', () => {
+  const html = read('index.html');
+  const app = read('assets/js/app.js');
+  const primaryTabs = [...html.matchAll(/class="ntab[^"\n]*"[^>]*data-sec=/g)];
+  assert.equal(primaryTabs.length, 4);
+  assert.match(html, /id="moreNavBtn"/);
+  assert.match(html, /id="focusModeMinimum"/);
+  assert.match(html, /id="quickTaskInput"/);
+  assert.match(app, /function renderFocusDashboard/);
+  assert.match(app, /function quickAddTodayTask/);
+});
+
+test('AI Coach can prioritize live planner data from focus shortcuts', () => {
+  const coach = read('assets/js/ai-coach.js');
+  assert.match(coach, /window\.openAiCoach/);
+  assert.match(coach, /window\.useAiPrompt/);
+  assert.match(coach, /exactly 3 realistic priorities/);
+  assert.match(coach, /window\.getPlannerCoachContext/);
 });
 
 test('tracker mutations queue saves and date math stays UTC-safe', () => {

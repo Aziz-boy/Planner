@@ -94,6 +94,7 @@ window._saveLocalBackup = function saveLocalBackup(options = {}) {
 // Local proxy references (reassigned after Firebase load)
 let state        = window._appState;
 let unsavedChanges = false;
+let autoSaveTimer = null;
 
 // Called by Firebase module on first load AND on every remote sync
 let _appInitialized = false;
@@ -109,29 +110,26 @@ window._onFirebaseLoaded = function(loadInfo = {}) {
   ytState      = window._ytState;
 
   if (!_appInitialized) {
-    // First load: full init
     _appInitialized = true;
     window._appInitialized = true;
     document.getElementById('loadingOverlay').style.display='none';
-    renderDashboard();
-    renderMoney();
-  } else {
-    // Remote sync from another device: re-render current visible section
-    renderAll();
-    const dot=document.getElementById('saveDot');
-    const lbl=document.getElementById('saveLabel');
-    const labels = {
-      cloud: 'Synced from cloud ✓',
-      cache: 'Offline — cached data',
-      'cloud-empty': 'Cloud connected — no saved data yet',
-      'local-fallback': 'Cloud sync unavailable — using local data',
-    };
-    if(dot) dot.className = loadInfo.source === 'local-fallback' ? 'save-dot error' : 'save-dot saved';
-    if(lbl && labels[loadInfo.source]) lbl.textContent = labels[loadInfo.source];
-    if (loadInfo.source === 'cloud') {
-      setTimeout(()=>{ if(lbl) lbl.textContent='Synced ✓'; }, 3000);
-    }
   }
+  // Every data source, including the first local backup and later cloud
+  // snapshots, refreshes the same UI path. Individual renderers are isolated so
+  // one legacy value cannot prevent the rest of the planner from loading.
+  renderAll();
+
+  const dot=document.getElementById('saveDot');
+  const lbl=document.getElementById('saveLabel');
+  const labels = {
+    local: 'Local data ready — checking cloud…',
+    cloud: 'Cloud synced ✓',
+    cache: 'Offline — cached data ready',
+    'cloud-empty': 'Cloud connected — ready to save',
+    'local-fallback': 'Cloud unavailable — local data is safe',
+  };
+  if(dot) dot.className = loadInfo.source === 'local-fallback' ? 'save-dot error' : 'save-dot saved';
+  if(lbl && labels[loadInfo.source]) lbl.textContent = labels[loadInfo.source];
 };
 
 function setSaveStatus(status, msg) {
@@ -165,7 +163,19 @@ function scheduleSave() {
   if (typeof roadmapState  !== 'undefined') window._roadmapState  = roadmapState;
   if (typeof studyPlan     !== 'undefined') window._studyPlan     = studyPlan;
   if (typeof customTasks   !== 'undefined') window._customTasks   = customTasks;
-  setSaveStatus('saving', 'Unsaved — click Save!');
+  // Keep a durable local copy immediately, then debounce cloud writes. The
+  // manual button remains as "Sync now", but normal use never depends on it.
+  window._saveLocalBackup?.({ markClean: false, quiet: true });
+  setSaveStatus('saving', 'Saving automatically…');
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(() => {
+    if (!_appInitialized) return;
+    if (window._firebaseModuleStarted && typeof window.saveAllData === 'function') {
+      window.saveAllData();
+    } else {
+      setSaveStatus('saved', 'Saved locally — cloud will retry');
+    }
+  }, 900);
 }
 
 // The Firebase module replaces this with cloud save. Local save remains available
@@ -188,6 +198,46 @@ const CATS = {
   business:{color:'#40C0D0', label:'Business'},
   plan:    {color:'#888',    label:'Planning'},
 };
+
+const CATEGORY_ALIASES = Object.freeze({
+  health: 'gym', fitness: 'gym', workout: 'gym',
+  deen: 'quran', faith: 'quran', prayer: 'quran',
+  education: 'study', school: 'study', learning: 'study',
+  money: 'finance', investing: 'finance',
+  youtube: 'content', social: 'content',
+  life: 'plan', personal: 'plan', general: 'plan',
+});
+
+function getCategoryMeta(value) {
+  const raw = String(value || 'plan').toLowerCase();
+  const key = CATS[raw] ? raw : (CATEGORY_ALIASES[raw] || 'plan');
+  return { key, ...CATS[key] };
+}
+
+function taskPoints(task) {
+  const points = Number(task?.pts);
+  return Number.isFinite(points) && points > 0 ? points : 1;
+}
+
+function escapeHTML(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+function safeHttpUrl(value) {
+  try {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    const url = new URL(raw, window.location.origin);
+    return ['http:', 'https:'].includes(url.protocol) ? url.href : '';
+  } catch {
+    return '';
+  }
+}
 
 const START = new Date('2026-05-30');
 const END   = new Date('2026-12-31');
@@ -479,7 +529,7 @@ function dayStats(date) {
   if(date<START||date>END) return {done:0,total:0,pts:0,maxPts:0,pct:0};
   const tasks=getTasksForDate(date), key=dateKey(date);
   let done=0,pts=0,maxPts=0;
-  tasks.forEach(t=>{maxPts+=t.pts; if(getTask(key,t.id)){done++;pts+=t.pts;}});
+  tasks.forEach(t=>{const p=taskPoints(t); maxPts+=p; if(getTask(key,t.id)){done++;pts+=p;}});
   return {done,total:tasks.length,pts,maxPts,pct:maxPts?Math.round(pts/maxPts*100):0};
 }
 
@@ -497,11 +547,12 @@ function catStatsRange(fromDate, toDate, catFilter, countAll) {
   while(d <= rangeEnd){
     const key = dateKey(d);
     getTasksForDate(d).forEach(t=>{
-      if(!catFilter || t.cat===catFilter){
+      if(!catFilter || getCategoryMeta(t.cat).key===catFilter){
+        const points = taskPoints(t);
         // Count as done if checked (regardless of date)
-        if(getTask(key, t.id)) done += t.pts;
+        if(getTask(key, t.id)) done += points;
         // Count as total only up to totalCap
-        if(d <= totalCap) total += t.pts;
+        if(d <= totalCap) total += points;
       }
     });
     d = addDays(d,1);
@@ -519,9 +570,10 @@ function overallStats() {
   while(d<=END){
     const key=dateKey(d);
     getTasksForDate(d).forEach(t=>{
-      allTotal += t.pts||1;
-      if(d <= today) elapsedTotal += t.pts||1;
-      if(getTask(key,t.id)) done += t.pts||1;
+      const points = taskPoints(t);
+      allTotal += points;
+      if(d <= today) elapsedTotal += points;
+      if(getTask(key,t.id)) done += points;
     });
     d=addDays(d,1);
   }
@@ -543,17 +595,37 @@ const MONTHS_SHORT=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oc
 const MONTHS_FULL =['','January','February','March','April','May','June','July','August','September','October','November','December'];
 const DAYS_FULL   =['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
+function renderSafely(name, renderer) {
+  try {
+    renderer();
+    return true;
+  } catch (error) {
+    console.error(`Planner renderer failed: ${name}`, error);
+    return false;
+  }
+}
+
 function renderAll() {
-  if (!_appInitialized) return; // never render before Firebase data is ready
-  renderDaily();
-  renderWeekly();
-  renderMonthly();
-  renderTracker();
-  renderVision();
-  // Overall bar
-  const ov=overallStats();
-  document.getElementById('overallFill').style.width=ov.pct+'%';
-  document.getElementById('overallPct').textContent=ov.pct+'%';
+  if (!_appInitialized) return [];
+  const failures = [];
+  [
+    ['daily', renderDaily],
+    ['weekly', renderWeekly],
+    ['monthly', renderMonthly],
+    ['tracker', renderTracker],
+    ['vision', renderVision],
+    ['dashboard', renderDashboard],
+  ].forEach(([name, renderer]) => {
+    if (!renderSafely(name, renderer)) failures.push(name);
+  });
+
+  renderSafely('overall progress', () => {
+    const ov=overallStats();
+    document.getElementById('overallFill').style.width=ov.pct+'%';
+    document.getElementById('overallPct').textContent=ov.pct+'%';
+  });
+  window._plannerRenderFailures = failures;
+  return failures;
 }
 
 // ── DAILY ──
@@ -616,11 +688,13 @@ function renderDaily() {
     }
 
     const done = getTask(key, t.id);
-    const c    = CATS[t.cat] || {color:'#888'};
+    const c    = getCategoryMeta(t.cat);
+    const taskText = escapeHTML(t.text || 'Untitled task');
+    const taskUrl = safeHttpUrl(t.url);
 
     // Study task: show sub-items as subtitle
     const subText = t.studyItems
-      ? t.studyItems.map(si => si.title).join(' · ')
+      ? escapeHTML(t.studyItems.map(si => si.title).join(' · '))
       : '';
 
     rows.push(`
@@ -630,7 +704,7 @@ function renderDaily() {
           <div class="tl-dot" style="background:${c.color};box-shadow:0 0 6px ${c.color}55;"></div>
         </div>
         <div class="tl-body">
-          <div class="tl-row-text">${t.text}${t.url?`<a href="${t.url}" target="_blank" onclick="event.stopPropagation()" class="tl-link">▶ Watch</a>`:''}</div>
+          <div class="tl-row-text">${taskText}${taskUrl?`<a href="${taskUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="tl-link">▶ Watch</a>`:''}</div>
           ${subText ? `<div class="tl-row-sub">${subText}</div>` : ''}
         </div>
         <div class="tl-chk" style="${done?'':'border-color:'+c.color+'44'}">${done?'✓':''}</div>
@@ -676,17 +750,20 @@ function renderWeekly() {
 
     // Accumulate category points for this week
     tasks.forEach(t=>{
-      if(!wkCats[t.cat]) wkCats[t.cat]={done:0,total:0};
-      wkCats[t.cat].total+=t.pts;
-      if(getTask(key,t.id)) wkCats[t.cat].done+=t.pts;
+      const cat = getCategoryMeta(t.cat).key;
+      const points = taskPoints(t);
+      if(!wkCats[cat]) wkCats[cat]={done:0,total:0};
+      wkCats[cat].total+=points;
+      if(getTask(key,t.id)) wkCats[cat].done+=points;
     });
 
     const mini=tasks.slice(0,4).map(t=>{
       const done=getTask(key,t.id);
-      const c=CATS[t.cat];
+      const c=getCategoryMeta(t.cat);
+      const label=escapeHTML(t.text || 'Untitled task');
       return `<div class="wday-t${done?' done':''}" style="background:${c.color}18;color:${c.color}">
         <div style="width:4px;height:4px;border-radius:50%;background:${c.color};flex-shrink:0"></div>
-        ${t.text.substring(0,18)}
+        ${label.substring(0,18)}
       </div>`;
     }).join('');
 
@@ -716,7 +793,7 @@ function renderWeekly() {
   document.getElementById('wgoals').innerHTML=wgCats.map(wg=>{
     const cp=wkCats[wg.key]||{done:0,total:0};
     const pct=cp.total?Math.round(cp.done/cp.total*100):0;
-    const c=CATS[wg.key];
+    const c=getCategoryMeta(wg.key);
     return `<div class="wg-item">
       <div class="wg-name">${wg.icon} ${wg.name}</div>
       <div class="wg-sub">${cp.done} / ${cp.total} pts this week</div>
@@ -1825,6 +1902,149 @@ function reflectThisWeek(){ reflectWkOff=0; renderReflect(); }
 // ═══════════════════════════════════════════
 // DASHBOARD
 // ═══════════════════════════════════════════
+let focusMode = (() => {
+  try { return localStorage.getItem('planner_focus_mode') === 'minimum' ? 'minimum' : 'standard'; }
+  catch { return 'standard'; }
+})();
+
+function taskMinutes(task) {
+  const [hours, minutes] = String(task?.time || '23:59').split(':').map(Number);
+  return (Number.isFinite(hours) ? hours : 23) * 60 + (Number.isFinite(minutes) ? minutes : 59);
+}
+
+function getFocusSelection(tasks, key) {
+  const incomplete = tasks
+    .filter(task => task?.id != null && !getTask(key, task.id))
+    .slice()
+    .sort((a, b) => taskMinutes(a) - taskMinutes(b));
+  if (!incomplete.length) return [];
+
+  if (focusMode === 'minimum') {
+    const selected = [];
+    ['quran', 'gym', 'plan'].forEach(category => {
+      const match = incomplete.find(task => getCategoryMeta(task.cat).key === category && !selected.includes(task));
+      if (match) selected.push(match);
+    });
+    incomplete.forEach(task => { if (selected.length < 3 && !selected.includes(task)) selected.push(task); });
+    return selected.slice(0, 3);
+  }
+
+  const now = nowTashkent();
+  const nowMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+  let startIndex = incomplete.findIndex(task => taskMinutes(task) >= nowMinutes - 30);
+  if (startIndex < 0) startIndex = Math.max(0, incomplete.length - 1);
+  return [
+    ...incomplete.slice(startIndex),
+    ...incomplete.slice(0, startIndex).reverse(),
+  ].slice(0, 3);
+}
+
+function focusTaskToken(id) {
+  return encodeURIComponent(String(id)).replaceAll("'", '%27');
+}
+
+function toggleFocusTask(token) {
+  toggleTask(tashKey(), decodeURIComponent(token));
+}
+
+function setFocusMode(mode) {
+  focusMode = mode === 'minimum' ? 'minimum' : 'standard';
+  try { localStorage.setItem('planner_focus_mode', focusMode); } catch {}
+  renderDashboard();
+}
+
+function renderFocusDashboard(tasks, key, taskDone, prayedToday, dietScore, todaySpent) {
+  const selection = getFocusSelection(tasks, key);
+  const remaining = Math.max(0, tasks.length - taskDone);
+  const standardButton = document.getElementById('focusModeStandard');
+  const minimumButton = document.getElementById('focusModeMinimum');
+  standardButton?.classList.toggle('active', focusMode === 'standard');
+  minimumButton?.classList.toggle('active', focusMode === 'minimum');
+
+  const message = document.getElementById('focusMessage');
+  if (message) {
+    message.textContent = remaining === 0
+      ? 'You are finished for today. Rest without guilt.'
+      : focusMode === 'minimum'
+        ? 'Busy day: protect the essentials. Anything else is a bonus.'
+        : `${remaining} task${remaining === 1 ? '' : 's'} remain. Do the next one, not the whole day at once.`;
+  }
+
+  const nowBox = document.getElementById('focusNow');
+  const list = document.getElementById('focusTasks');
+  if (!selection.length) {
+    if (nowBox) nowBox.innerHTML = `<div class="focus-complete"><strong>Day complete ✓</strong><span>You kept the promises that mattered today.</span></div>`;
+    if (list) list.innerHTML = '';
+  } else {
+    const next = selection[0];
+    const nextCategory = getCategoryMeta(next.cat);
+    const nextText = escapeHTML(next.text || 'Untitled task');
+    if (nowBox) nowBox.innerHTML = `
+      <div class="focus-now">
+        <span class="focus-now-badge">DO NOW</span>
+        <span class="focus-now-main">
+          <strong>${nextText}</strong>
+          <small>${escapeHTML(next.time || 'Any time')} · ${escapeHTML(nextCategory.label)} · ${taskPoints(next)} pts</small>
+        </span>
+        <button class="focus-check" onclick="toggleFocusTask('${focusTaskToken(next.id)}')" title="Mark complete" aria-label="Mark ${nextText} complete"><i class="fa-solid fa-check"></i></button>
+      </div>`;
+    if (list) list.innerHTML = selection.slice(1).map(task => {
+      const category = getCategoryMeta(task.cat);
+      return `<div class="focus-task" onclick="toggleFocusTask('${focusTaskToken(task.id)}')">
+        <span class="focus-task-dot" style="background:${category.color}"></span>
+        <span class="focus-task-text">${escapeHTML(task.text || 'Untitled task')}</span>
+        <span class="focus-task-time">${escapeHTML(task.time || '')}</span>
+        <i class="fa-regular fa-circle-check" style="color:${category.color}"></i>
+      </div>`;
+    }).join('');
+  }
+
+  const prayerSummary = document.getElementById('focusPrayerSummary');
+  const dietSummary = document.getElementById('focusDietSummary');
+  const moneySummary = document.getElementById('focusMoneySummary');
+  if (prayerSummary) prayerSummary.textContent = `${prayedToday}/5 recorded today`;
+  if (dietSummary) dietSummary.textContent = `${dietScore}/4 essentials complete`;
+  if (moneySummary) moneySummary.textContent = todaySpent ? `${fmtNum(todaySpent)} so'm spent` : 'No spending logged';
+}
+
+function quickAddTodayTask() {
+  const input = document.getElementById('quickTaskInput');
+  const status = document.getElementById('quickTaskStatus');
+  const text = input?.value.trim();
+  if (!text) {
+    if (status) status.textContent = 'Write a short next action first.';
+    input?.focus();
+    return;
+  }
+
+  const date = todayUTC();
+  const key = tashKey();
+  const currentTasks = getTasksForDate(date).map(task => ({ ...task }));
+  const now = nowTashkent();
+  const roundedMinutes = Math.min(23 * 60 + 45, Math.ceil((now.getUTCHours() * 60 + now.getUTCMinutes() + 15) / 15) * 15);
+  const time = `${String(Math.floor(roundedMinutes / 60)).padStart(2, '0')}:${String(roundedMinutes % 60).padStart(2, '0')}`;
+  currentTasks.push({
+    id: `quick_${Date.now()}`,
+    cat: 'plan',
+    text: text.slice(0, 160),
+    time,
+    pts: 2,
+  });
+  customTasks[key] = currentTasks;
+  window._customTasks = customTasks;
+  input.value = '';
+  scheduleSave();
+  renderAll();
+  if (status) status.textContent = 'Added to today and saving automatically ✓';
+}
+
+function askCoachToPrioritize() {
+  const prompt = focusMode === 'minimum'
+    ? 'Using my live planner data, build the smallest realistic successful day for me. Give me exactly 3 actions and keep the answer short.'
+    : 'Using my live planner data and current progress, choose exactly 3 realistic priorities for today. Tell me which one to start now and keep the answer short.';
+  window.openAiCoach?.(prompt, true);
+}
+
 function renderDashboard(){
   const today = nowTashkent(); // Tashkent time — use UTC accessors
   const key   = tashKey();
@@ -1861,6 +2081,7 @@ function renderDashboard(){
   const todaySpent = getDayTotal(key);
 
   const overallPct = overallStats().pct;
+  renderFocusDashboard(tasks, key, taskDone, prayedToday, dietScore, todaySpent);
 
   // Each card navigates to its section on click — navTo is global so onclick can reach it
   document.getElementById('dashPulse').innerHTML = [
@@ -1882,11 +2103,12 @@ function renderDashboard(){
   // Today's tasks mini list
   document.getElementById('dashTasks').innerHTML = tasks.slice(0,6).map(t=>{
     const done = getTask(key,t.id);
-    const c = CATS[t.cat];
+    const c = getCategoryMeta(t.cat);
+    const label = escapeHTML(t.text || 'Untitled task');
     return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #1a1a1a;">
       <div style="width:14px;height:14px;border-radius:3px;border:2px solid ${done?c.color:'#444'};background:${done?c.color:'transparent'};display:flex;align-items:center;justify-content:center;font-size:0.55rem;color:#000;flex-shrink:0;">${done?'✓':''}</div>
-      <div style="font-size:0.75rem;${done?'text-decoration:line-through;opacity:0.5':''};flex:1;">${t.text.substring(0,35)}${t.text.length>35?'...':''}</div>
-      <div style="font-size:0.6rem;color:var(--muted);">${t.time}</div>
+      <div style="font-size:0.75rem;${done?'text-decoration:line-through;opacity:0.5':''};flex:1;">${label.substring(0,35)}${label.length>35?'...':''}</div>
+      <div style="font-size:0.6rem;color:var(--muted);">${escapeHTML(t.time || '')}</div>
     </div>`;
   }).join('')+
   (tasks.length>6?`<div style="font-size:0.68rem;color:var(--muted);padding:6px 0;">+${tasks.length-6} more tasks...</div>`:'');
@@ -2210,26 +2432,51 @@ function renderYoutube(){
 
 // Global nav helper — used by dashboard cards onclick
 function navTo(id) {
-  const tab = document.querySelector(`.ntab[onclick*="'${id}'"]`);
-  if (tab) tab.click();
+  const tab = document.querySelector(`.ntab[data-sec="${id}"]`) || document.getElementById('moreNavBtn');
+  showSec(id, tab);
 }
 
 function showSec(id,tab){
+  const section = document.getElementById('sec-'+id);
+  if (!section) return;
   document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('active'));
-  document.getElementById('sec-'+id).classList.add('active');
-  tab.classList.add('active');
-  if(id==='dash')         { renderDashboard(); renderStreakWall(); setTimeout(()=>{renderBestDay();renderMonthCompare();},50); }
-  else if(id==='diet')    renderDiet();
-  else if(id==='money')   renderMoney();
-  else if(id==='prayer')  renderPrayer();
-  else if(id==='workout') renderWorkout();
-  else if(id==='reflect') { renderReflect(); setTimeout(renderReflectChart, 50); }
-  else if(id==='tracker') { renderTracker(); renderStreakWall(); setTimeout(renderWeightChart, 50); }
-  else if(id==='youtube') renderYoutube();
-  else if(id==='aiplan')  { if(typeof renderAIPlan==='function' && aiPlanState) renderAIPlan(); }
-  else if(id==='roadmap') { if(typeof renderRoadmap==='function') renderRoadmap(); }
+  section.classList.add('active');
+  (tab || document.getElementById('moreNavBtn'))?.classList.add('active');
+  closeMoreMenu();
+
+  if(id==='dash')         { renderSafely('dashboard', renderDashboard); renderSafely('streak wall', renderStreakWall); setTimeout(()=>{renderSafely('best day',renderBestDay);renderSafely('month comparison',renderMonthCompare);},50); }
+  else if(id==='diet')    renderSafely('diet', renderDiet);
+  else if(id==='money')   renderSafely('money', renderMoney);
+  else if(id==='prayer')  renderSafely('prayer', renderPrayer);
+  else if(id==='workout') renderSafely('workout', renderWorkout);
+  else if(id==='reflect') { renderSafely('reflection', renderReflect); setTimeout(()=>renderSafely('reflection chart',renderReflectChart),50); }
+  else if(id==='tracker') { renderSafely('tracker', renderTracker); renderSafely('streak wall', renderStreakWall); setTimeout(()=>renderSafely('weight chart',renderWeightChart),50); }
+  else if(id==='youtube') renderSafely('youtube', renderYoutube);
+  else if(id==='aiplan')  { if(typeof renderAIPlan==='function' && aiPlanState) renderSafely('AI plan', renderAIPlan); }
+  else if(id==='roadmap') { if(typeof renderRoadmap==='function') renderSafely('roadmap', renderRoadmap); }
   else renderAll();
+}
+
+function toggleMoreMenu() {
+  const menu = document.getElementById('moreMenu');
+  const backdrop = document.getElementById('moreMenuBackdrop');
+  const button = document.getElementById('moreNavBtn');
+  const open = !menu?.classList.contains('open');
+  menu?.classList.toggle('open', open);
+  backdrop?.classList.toggle('open', open);
+  menu?.setAttribute('aria-hidden', String(!open));
+  button?.setAttribute('aria-expanded', String(open));
+}
+
+function closeMoreMenu() {
+  const menu = document.getElementById('moreMenu');
+  const backdrop = document.getElementById('moreMenuBackdrop');
+  const button = document.getElementById('moreNavBtn');
+  menu?.classList.remove('open');
+  backdrop?.classList.remove('open');
+  menu?.setAttribute('aria-hidden', 'true');
+  button?.setAttribute('aria-expanded', 'false');
 }
 function changeDay(n){ curDate=clamp(addDays(curDate,n)); renderAll(); }
 function goToday(){ curDate=clamp(todayUTC()); renderAll(); }
@@ -2664,9 +2911,9 @@ function renderMonthCompare() {
     const dx = e.changedTouches[0].clientX - touchX;
     const dy = e.changedTouches[0].clientY - touchY;
     if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.8) return;
-    const active = document.querySelector('.ntab.active');
+    const active = document.querySelector('.ntab[data-sec].active');
     if (!active) return;
-    const tabs = Array.from(document.querySelectorAll('.ntab'));
+    const tabs = Array.from(document.querySelectorAll('.ntab[data-sec]'));
     const idx  = tabs.indexOf(active);
     const next = dx < 0 ? Math.min(idx+1, tabs.length-1) : Math.max(idx-1, 0);
     if (next !== idx) tabs[next].click();
@@ -2677,8 +2924,6 @@ function renderMonthCompare() {
 // WIRE WEIGHT + AI PLAN INTO FIREBASE
 // ═══════════════════════════════════════════
 // scheduleSave: sync weightState to window global before any save
-const _origScheduleSave = scheduleSave;
-
 // _onFirebaseLoaded: runs on every Firestore snapshot (initial + remote updates)
 const _origLoaded = window._onFirebaseLoaded;
 window._onFirebaseLoaded = function(loadInfo = {}) {
@@ -2688,18 +2933,18 @@ window._onFirebaseLoaded = function(loadInfo = {}) {
   studyPlan     = window._studyPlan     || null;
   customTasks   = window._customTasks   || {};
   if (_origLoaded) _origLoaded(loadInfo);
-  renderWeightChart();
-  renderDashWeightCard();
-  renderBestDay();
-  renderMonthCompare();
-  renderReflectChart();
+  renderSafely('weight chart', renderWeightChart);
+  renderSafely('weight summary', renderDashWeightCard);
+  renderSafely('best day', renderBestDay);
+  renderSafely('month comparison', renderMonthCompare);
+  renderSafely('reflection chart', renderReflectChart);
   // Restore AI plan UI if a saved plan exists
   if (aiPlanState) {
     document.getElementById('planDisplay').style.display  = 'block';
     document.getElementById('planEmpty').style.display    = 'none';
     document.getElementById('planClearBtn').style.display = 'inline-flex';
     document.getElementById('planSubtitle').textContent   = `Last generated: ${aiPlanState.generatedAt || 'saved'} · Tasks auto-populated into Daily view`;
-    renderAIPlan();
+    renderSafely('AI plan', renderAIPlan);
     renderAll();
   }
   // Restore study plan UI if a saved study plan exists
@@ -2707,7 +2952,7 @@ window._onFirebaseLoaded = function(loadInfo = {}) {
     document.getElementById('studyPlanDisplay').style.display = 'block';
     document.getElementById('studyInputArea').style.display   = 'none';
     document.getElementById('studyClearBtn').style.display    = 'inline-block';
-    renderStudyPlan();
+    renderSafely('study plan', renderStudyPlan);
   }
 };
 
@@ -2939,8 +3184,8 @@ function renderAIPlan() {
                 <div style="font-size:0.62rem;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">${type==='weekday'?'Mon–Fri':type==='saturday'?'Saturday':'Sunday'}</div>
                 ${tasks.map(t=>`<div style="display:flex;gap:6px;align-items:flex-start;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.03);">
                   <div style="font-size:0.62rem;color:var(--muted);min-width:36px;">${t.time}</div>
-                  <div style="width:6px;height:6px;border-radius:50%;background:${(CATS[t.cat]||{color:'#888'}).color};flex-shrink:0;margin-top:3px;"></div>
-                  <div style="font-size:0.73rem;color:var(--text);">${t.text}</div>
+                  <div style="width:6px;height:6px;border-radius:50%;background:${getCategoryMeta(t.cat).color};flex-shrink:0;margin-top:3px;"></div>
+                  <div style="font-size:0.73rem;color:var(--text);">${escapeHTML(t.text)}</div>
                 </div>`).join('')}
               </div>` : '';
             }).join('')}

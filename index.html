@@ -8,7 +8,7 @@
 <link rel="apple-touch-icon" href="assets/icons/planner.svg">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-<link rel="stylesheet" href="assets/css/app.css?v=3.0.5">
+<link rel="stylesheet" href="assets/css/app.css?v=3.1.0">
 </head>
 <body>
 
@@ -20,7 +20,7 @@
 <div class="save-bar" style="position:sticky;top:0;z-index:200;">
   <div class="save-dot" id="saveDot"></div>
   <div class="save-label" id="saveLabel">Ready</div>
-  <button id="globalSaveBtn" onclick="saveAllData()" style="margin-left:auto;background:rgba(201,168,76,0.15);border:1px solid #8B6914;color:#C9A84C;padding:5px 18px;border-radius:5px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:0.75rem;font-weight:600;transition:all .2s;">💾 Save Progress</button>
+  <button id="globalSaveBtn" class="sync-btn" onclick="saveAllData()" title="Save and sync now">↻ Sync now</button>
 </div>
 
 <div class="hstrip">
@@ -40,22 +40,27 @@
   </div>
 </div>
 
-<div class="nav">
-  <div class="ntab active" onclick="showSec('dash',this)"><span class="nav-icon"><i class="fa-solid fa-gauge-high"></i></span> Dashboard</div>
-  <div class="ntab" onclick="showSec('daily',this)"><span class="nav-icon"><i class="fa-solid fa-calendar-day"></i></span> Daily</div>
-  <div class="ntab" onclick="showSec('weekly',this)"><span class="nav-icon"><i class="fa-solid fa-calendar-week"></i></span> Weekly</div>
-  <div class="ntab" onclick="showSec('monthly',this)"><span class="nav-icon"><i class="fa-solid fa-calendar"></i></span> Monthly</div>
-  <div class="ntab" onclick="showSec('tracker',this)"><span class="nav-icon"><i class="fa-solid fa-chart-line"></i></span> Tracker</div>
-  <div class="ntab" onclick="showSec('aiplan',this)"><span class="nav-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></span> AI Plan</div>
-  <div class="ntab" onclick="showSec('vision',this)"><span class="nav-icon"><i class="fa-solid fa-eye"></i></span> Vision</div>
-  <div class="ntab" onclick="showSec('diet',this)"><span class="nav-icon"><i class="fa-solid fa-leaf"></i></span> Diet</div>
-  <div class="ntab" onclick="showSec('money',this)"><span class="nav-icon"><i class="fa-solid fa-coins"></i></span> Money</div>
-  <div class="ntab" onclick="showSec('prayer',this)"><span class="nav-icon"><i class="fa-solid fa-mosque"></i></span> Prayer</div>
-  <div class="ntab" onclick="showSec('workout',this)"><span class="nav-icon"><i class="fa-solid fa-dumbbell"></i></span> Workout</div>
-  <div class="ntab" onclick="showSec('reflect',this)"><span class="nav-icon"><i class="fa-solid fa-brain"></i></span> Reflection</div>
-  <div class="ntab" onclick="showSec('youtube',this)"><span class="nav-icon"><i class="fa-brands fa-youtube"></i></span> YouTube</div>
-  <div class="ntab" onclick="showSec('roadmap',this)"><span class="nav-icon"><i class="fa-solid fa-map"></i></span> Roadmap</div>
+<div class="nav" aria-label="Primary planner navigation">
+  <button class="ntab active" data-sec="dash" onclick="showSec('dash',this)"><span class="nav-icon"><i class="fa-solid fa-bullseye"></i></span> Focus</button>
+  <button class="ntab" data-sec="daily" onclick="showSec('daily',this)"><span class="nav-icon"><i class="fa-solid fa-calendar-day"></i></span> Today</button>
+  <button class="ntab" data-sec="aiplan" onclick="showSec('aiplan',this)"><span class="nav-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></span> Plan</button>
+  <button class="ntab" data-sec="reflect" onclick="showSec('reflect',this)"><span class="nav-icon"><i class="fa-solid fa-rotate"></i></span> Review</button>
+  <button class="ntab" id="moreNavBtn" onclick="toggleMoreMenu()" aria-expanded="false" aria-controls="moreMenu"><span class="nav-icon"><i class="fa-solid fa-grip"></i></span> More</button>
 </div>
+
+<div class="more-menu" id="moreMenu" aria-hidden="true">
+  <button onclick="navTo('weekly')"><i class="fa-solid fa-calendar-week"></i><span>Weekly</span></button>
+  <button onclick="navTo('monthly')"><i class="fa-solid fa-calendar"></i><span>Monthly</span></button>
+  <button onclick="navTo('tracker')"><i class="fa-solid fa-chart-line"></i><span>Tracker</span></button>
+  <button onclick="navTo('prayer')"><i class="fa-solid fa-mosque"></i><span>Prayer</span></button>
+  <button onclick="navTo('diet')"><i class="fa-solid fa-leaf"></i><span>Diet</span></button>
+  <button onclick="navTo('workout')"><i class="fa-solid fa-dumbbell"></i><span>Workout</span></button>
+  <button onclick="navTo('money')"><i class="fa-solid fa-coins"></i><span>Money</span></button>
+  <button onclick="navTo('youtube')"><i class="fa-brands fa-youtube"></i><span>YouTube</span></button>
+  <button onclick="navTo('vision')"><i class="fa-solid fa-eye"></i><span>Vision</span></button>
+  <button onclick="navTo('roadmap')"><i class="fa-solid fa-map"></i><span>Roadmap</span></button>
+</div>
+<div class="more-menu-backdrop" id="moreMenuBackdrop" onclick="closeMoreMenu()"></div>
 
 <!-- YOUTUBE -->
 <div class="sec" id="sec-youtube">
@@ -81,85 +86,127 @@
 
 <!-- DASHBOARD -->
 <div class="sec active" id="sec-dash">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+  <div class="focus-heading">
     <div>
       <div class="sec-title" id="dashGreeting"></div>
       <div class="sec-sub" style="margin-bottom:0;" id="dashDate"></div>
     </div>
-    <div style="font-size:0.75rem;color:var(--muted);text-align:right;" id="dashCountdown"></div>
+    <div class="focus-countdown" id="dashCountdown"></div>
   </div>
 
-  <!-- TOP ROW: Today's pulse -->
-  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px;" id="dashPulse"></div>
-
-  <!-- MIDDLE: Tasks + Prayer side by side -->
-  <div id="dashMiddle" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
-    <div class="task-card">
-      <div class="task-card-hdr" style="color:var(--gold)"><i class="fa-solid fa-list-check" style="margin-right:6px;"></i>Today's Tasks</div>
-      <div id="dashTasks"></div>
-      <button class="btn btn-gold" onclick="showSec('daily',document.querySelectorAll('.ntab')[1])" style="width:100%;margin-top:10px;padding:8px;">Open Daily →</button>
+  <div class="focus-card" id="focusCard">
+    <div class="focus-card-top">
+      <div>
+        <div class="focus-eyebrow">TODAY'S COMMAND CENTER</div>
+        <h2>Your next three actions</h2>
+        <p id="focusMessage">One useful action is enough to restart momentum.</p>
+      </div>
+      <div class="focus-mode-switch" aria-label="Daily workload mode">
+        <button id="focusModeStandard" onclick="setFocusMode('standard')">Standard</button>
+        <button id="focusModeMinimum" onclick="setFocusMode('minimum')">Minimum day</button>
+      </div>
     </div>
-    <div class="task-card">
-      <div class="task-card-hdr" style="color:var(--gold)"><i class="fa-solid fa-mosque" style="margin-right:6px;"></i>Today's Prayers</div>
-      <div id="dashPrayers"></div>
-      <button class="btn btn-gold" onclick="showSec('prayer',document.querySelectorAll('.ntab')[8])" style="width:100%;margin-top:10px;padding:8px;">Open Prayer →</button>
+    <div id="focusNow"></div>
+    <div class="focus-task-list" id="focusTasks"></div>
+    <div class="focus-actions">
+      <button class="btn btn-gold" onclick="navTo('daily')"><i class="fa-solid fa-calendar-day"></i> Open full day</button>
+      <button class="btn" onclick="askCoachToPrioritize()"><i class="fa-solid fa-brain"></i> Ask Coach to simplify</button>
     </div>
-  </div>
-
-  <!-- STREAK WALL MINI -->
-  <div class="task-card" style="margin-bottom:16px;">
-    <div class="task-card-hdr" style="color:var(--gold)"><i class="fa-solid fa-fire" style="margin-right:6px;"></i>Habit Streaks</div>
-    <div id="dashStreaks" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:10px;"></div>
-  </div>
-
-  <!-- INSIGHTS ROW -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;" id="dashInsights">
-    <div class="task-card">
-      <div class="task-card-hdr" style="color:var(--gold)"><i class="fa-solid fa-calendar-check" style="margin-right:6px;"></i>Best Day Analysis</div>
-      <div id="dashBestDay" style="margin-top:6px;"></div>
-    </div>
-    <div class="task-card">
-      <div class="task-card-hdr" style="color:var(--gold)"><i class="fa-solid fa-chart-bar" style="margin-right:6px;"></i>Monthly Comparison</div>
-      <canvas id="monthCompareChart" height="100" style="width:100%;display:block;margin-top:8px;"></canvas>
+    <div class="quick-capture">
+      <label for="quickTaskInput">Something else on your mind?</label>
+      <div>
+        <input id="quickTaskInput" type="text" maxlength="160" placeholder="Add one task for today…" onkeydown="if(event.key==='Enter'){event.preventDefault();quickAddTodayTask();}">
+        <button onclick="quickAddTodayTask()">+ Add</button>
+      </div>
+      <span id="quickTaskStatus"></span>
     </div>
   </div>
 
-  <!-- BOTTOM ROW: Money + Diet + Goals -->
-  <div id="dashBottom" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:16px;">
-    <div class="task-card">
-      <div class="task-card-hdr" style="color:var(--gold)"><i class="fa-solid fa-coins" style="margin-right:6px;"></i>Money Today</div>
-      <div id="dashMoney"></div>
-    </div>
-    <div class="task-card">
-      <div class="task-card-hdr" style="color:var(--gold)"><i class="fa-solid fa-leaf" style="margin-right:6px;"></i>Diet Today</div>
-      <div id="dashDiet"></div>
-    </div>
-    <div class="task-card">
-      <div class="task-card-hdr" style="color:var(--gold)"><i class="fa-solid fa-chart-line" style="margin-right:6px;"></i>Top Goals</div>
-      <div id="dashGoals"></div>
-    </div>
+  <div class="today-essentials">
+    <button class="essential-card" onclick="navTo('prayer')">
+      <span class="essential-icon prayer"><i class="fa-solid fa-mosque"></i></span>
+      <span><strong>Prayer</strong><small id="focusPrayerSummary">Open tracker</small></span>
+      <i class="fa-solid fa-chevron-right"></i>
+    </button>
+    <button class="essential-card" onclick="navTo('diet')">
+      <span class="essential-icon diet"><i class="fa-solid fa-leaf"></i></span>
+      <span><strong>Diet</strong><small id="focusDietSummary">Open tracker</small></span>
+      <i class="fa-solid fa-chevron-right"></i>
+    </button>
+    <button class="essential-card" onclick="navTo('money')">
+      <span class="essential-icon money"><i class="fa-solid fa-coins"></i></span>
+      <span><strong>Money</strong><small id="focusMoneySummary">Open tracker</small></span>
+      <i class="fa-solid fa-chevron-right"></i>
+    </button>
   </div>
 
-  <!-- WEIGHT PROGRESS -->
-  <div class="task-card" id="dashWeightCard" style="border-top:3px solid #4CAF7D;">
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
-      <div class="task-card-hdr" style="color:#4CAF7D;margin-bottom:0;">⚖️ Weight Journey · 105 → 90 kg</div>
-      <button onclick="navTo('tracker')" style="font-size:0.65rem;color:#4CAF7D;background:rgba(76,175,125,0.1);border:1px solid rgba(76,175,125,0.25);border-radius:6px;padding:3px 10px;cursor:pointer;">Full chart →</button>
-    </div>
+  <details class="planner-insights" id="plannerInsights">
+    <summary><span><i class="fa-solid fa-chart-simple"></i> Full dashboard and analytics</span><small>Open when you want to review, not when you need to act</small></summary>
 
-    <!-- Progress bar -->
-    <div id="dashWeightProgress"></div>
+    <div class="analytics-body">
+      <div class="dash-pulse-grid" id="dashPulse"></div>
 
-    <!-- Quick log -->
-    <div style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap;">
-      <input id="dashWeightInput" type="number" step="0.1" min="50" max="200" placeholder="Today's weight (kg)"
-        style="flex:1;min-width:120px;background:rgba(255,255,255,0.04);border:1px solid rgba(76,175,125,0.25);border-radius:8px;color:var(--text);padding:7px 12px;font-size:0.82rem;font-family:'DM Sans',sans-serif;">
-      <input id="dashCalInput" type="number" min="0" max="5000" placeholder="Calories burned"
-        style="flex:1;min-width:120px;background:rgba(255,255,255,0.04);border:1px solid rgba(76,175,125,0.25);border-radius:8px;color:var(--text);padding:7px 12px;font-size:0.82rem;font-family:'DM Sans',sans-serif;">
-      <button onclick="logWeightFromDash()" style="background:linear-gradient(135deg,rgba(76,175,125,0.3),rgba(76,175,125,0.15));border:1px solid rgba(76,175,125,0.4);color:#4CAF7D;padding:7px 16px;border-radius:8px;font-size:0.8rem;font-weight:600;cursor:pointer;white-space:nowrap;">+ Log</button>
+      <div id="dashMiddle" class="dash-middle-grid">
+        <div class="task-card">
+          <div class="task-card-hdr" style="color:var(--gold)"><i class="fa-solid fa-list-check" style="margin-right:6px;"></i>All Today's Tasks</div>
+          <div id="dashTasks"></div>
+          <button class="btn btn-gold" onclick="navTo('daily')" style="width:100%;margin-top:10px;padding:8px;">Open Today →</button>
+        </div>
+        <div class="task-card">
+          <div class="task-card-hdr" style="color:var(--gold)"><i class="fa-solid fa-mosque" style="margin-right:6px;"></i>Today's Prayers</div>
+          <div id="dashPrayers"></div>
+          <button class="btn btn-gold" onclick="navTo('prayer')" style="width:100%;margin-top:10px;padding:8px;">Open Prayer →</button>
+        </div>
+      </div>
+
+      <div class="task-card analytics-block">
+        <div class="task-card-hdr" style="color:var(--gold)"><i class="fa-solid fa-fire" style="margin-right:6px;"></i>Habit Streaks</div>
+        <div id="dashStreaks" class="dash-streak-grid"></div>
+      </div>
+
+      <div class="dash-insights-grid" id="dashInsights">
+        <div class="task-card">
+          <div class="task-card-hdr" style="color:var(--gold)"><i class="fa-solid fa-calendar-check" style="margin-right:6px;"></i>Best Day Analysis</div>
+          <div id="dashBestDay" style="margin-top:6px;"></div>
+        </div>
+        <div class="task-card">
+          <div class="task-card-hdr" style="color:var(--gold)"><i class="fa-solid fa-chart-bar" style="margin-right:6px;"></i>Monthly Comparison</div>
+          <canvas id="monthCompareChart" height="100" style="width:100%;display:block;margin-top:8px;"></canvas>
+        </div>
+      </div>
+
+      <div id="dashBottom" class="dash-bottom-grid">
+        <div class="task-card">
+          <div class="task-card-hdr" style="color:var(--gold)"><i class="fa-solid fa-coins" style="margin-right:6px;"></i>Money Today</div>
+          <div id="dashMoney"></div>
+        </div>
+        <div class="task-card">
+          <div class="task-card-hdr" style="color:var(--gold)"><i class="fa-solid fa-leaf" style="margin-right:6px;"></i>Diet Today</div>
+          <div id="dashDiet"></div>
+        </div>
+        <div class="task-card">
+          <div class="task-card-hdr" style="color:var(--gold)"><i class="fa-solid fa-chart-line" style="margin-right:6px;"></i>Top Goals</div>
+          <div id="dashGoals"></div>
+        </div>
+      </div>
+
+      <div class="task-card" id="dashWeightCard" style="border-top:3px solid #4CAF7D;">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+          <div class="task-card-hdr" style="color:#4CAF7D;margin-bottom:0;">⚖️ Weight Journey · 105 → 90 kg</div>
+          <button onclick="navTo('tracker')" style="font-size:0.65rem;color:#4CAF7D;background:rgba(76,175,125,0.1);border:1px solid rgba(76,175,125,0.25);border-radius:6px;padding:3px 10px;cursor:pointer;">Full chart →</button>
+        </div>
+        <div id="dashWeightProgress"></div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap;">
+          <input id="dashWeightInput" type="number" step="0.1" min="50" max="200" placeholder="Today's weight (kg)"
+            style="flex:1;min-width:120px;background:rgba(255,255,255,0.04);border:1px solid rgba(76,175,125,0.25);border-radius:8px;color:var(--text);padding:7px 12px;font-size:0.82rem;font-family:'DM Sans',sans-serif;">
+          <input id="dashCalInput" type="number" min="0" max="5000" placeholder="Calories burned"
+            style="flex:1;min-width:120px;background:rgba(255,255,255,0.04);border:1px solid rgba(76,175,125,0.25);border-radius:8px;color:var(--text);padding:7px 12px;font-size:0.82rem;font-family:'DM Sans',sans-serif;">
+          <button onclick="logWeightFromDash()" style="background:linear-gradient(135deg,rgba(76,175,125,0.3),rgba(76,175,125,0.15));border:1px solid rgba(76,175,125,0.4);color:#4CAF7D;padding:7px 16px;border-radius:8px;font-size:0.8rem;font-weight:600;cursor:pointer;white-space:nowrap;">+ Log</button>
+        </div>
+        <div id="dashWeightStatus" style="font-size:0.7rem;color:var(--muted);margin-top:5px;min-height:16px;"></div>
+      </div>
     </div>
-    <div id="dashWeightStatus" style="font-size:0.7rem;color:var(--muted);margin-top:5px;min-height:16px;"></div>
-  </div>
+  </details>
 </div>
 
 <!-- PRAYER -->
@@ -860,8 +907,8 @@ Broker kim? https://youtu.be/..."></textarea>
 </div>
 
 
-<script src="assets/js/config.js?v=3.0.5"></script>
-<script src="assets/js/app.js?v=3.0.5"></script>
+<script src="assets/js/config.js?v=3.1.0"></script>
+<script src="assets/js/app.js?v=3.1.0"></script>
 
 
 <!-- ── AI Coach Chat Widget ───────────────────────────────────────────────── -->
@@ -884,14 +931,19 @@ Broker kim? https://youtu.be/..."></textarea>
   <div id="ai-messages">
     <div class="ai-msg bot">👋 Salom! I'm your AI Coach. Ask me anything about your goals, progress, or plan — or switch to Russian practice mode!</div>
   </div>
+  <div class="ai-quick-prompts" id="aiQuickPrompts">
+    <button onclick="useAiPrompt('priority')">Choose my top 3</button>
+    <button onclick="useAiPrompt('recovery')">Help me restart</button>
+    <button onclick="useAiPrompt('minimum')">Build a minimum day</button>
+  </div>
   <div id="ai-input-row">
     <textarea id="ai-input" rows="1" placeholder="Type a message..."></textarea>
     <button id="ai-send" onclick="aiSend()">Send ↑</button>
   </div>
 </div>
 
-<script src="assets/js/ai-coach.js?v=3.0.5"></script>
-<script src="assets/js/notifications.js?v=3.0.5"></script>
-<script type="module" src="assets/js/firebase-storage.js?v=3.0.5"></script>
+<script src="assets/js/ai-coach.js?v=3.1.0"></script>
+<script src="assets/js/notifications.js?v=3.1.0"></script>
+<script type="module" src="assets/js/firebase-storage.js?v=3.1.0"></script>
 </body>
 </html>
