@@ -8,7 +8,7 @@
 <link rel="apple-touch-icon" href="assets/icons/planner.svg">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-<link rel="stylesheet" href="assets/css/app.css?v=3.1.0">
+<link rel="stylesheet" href="assets/css/app.css?v=3.2.0">
 </head>
 <body>
 
@@ -511,63 +511,119 @@
   <div id="dayContent"></div>
 
   <!-- ── Day Editor Panel ───────────────────────────────────── -->
-  <div id="dayEditor" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,0.7);overflow-y:auto;">
-    <div style="background:var(--dark2);border:1px solid rgba(201,168,76,0.2);border-radius:16px;margin:20px auto;max-width:500px;padding:20px;position:relative;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+  <div id="dayEditor" class="task-editor-backdrop" role="dialog" aria-modal="true" aria-labelledby="editorTitle" onclick="if(event.target===this)closeDayEditor()">
+    <div class="task-editor-modal">
+      <header class="task-editor-header">
         <div>
-          <div style="font-weight:700;font-size:1rem;color:var(--gold);">✏️ Edit Tasks</div>
-          <div style="font-size:0.7rem;color:var(--muted);" id="editorDateLabel"></div>
+          <div class="task-editor-eyebrow">DAILY SCHEDULE</div>
+          <h2 id="editorTitle">Edit tasks</h2>
+          <p id="editorDateLabel"></p>
         </div>
-        <button onclick="closeDayEditor()" style="background:none;border:none;color:var(--muted);font-size:1.2rem;cursor:pointer;">✕</button>
+        <button class="task-editor-close" onclick="closeDayEditor()" aria-label="Close task editor">✕</button>
+      </header>
+
+      <div class="task-editor-body">
+        <section class="editor-section" id="editorScopeSection">
+          <div class="editor-section-title"><span>1</span> Where should this schedule apply?</div>
+          <div class="editor-scope-grid">
+            <label class="editor-choice">
+              <input type="radio" name="editScope" value="day" checked onchange="updateEditorScopePreview()">
+              <span><strong>This day</strong><small>Only the selected date</small></span>
+            </label>
+            <label class="editor-choice">
+              <input type="radio" name="editScope" value="week" onchange="updateEditorScopePreview()">
+              <span><strong>Rest of week</strong><small>Selected date through Sunday</small></span>
+            </label>
+            <label class="editor-choice">
+              <input type="radio" name="editScope" value="next7" onchange="updateEditorScopePreview()">
+              <span><strong>Next 7 days</strong><small>Starting from selected date</small></span>
+            </label>
+            <label class="editor-choice">
+              <input type="radio" name="editScope" value="month" onchange="updateEditorScopePreview()">
+              <span><strong>Rest of month</strong><small>Selected date through month end</small></span>
+            </label>
+          </div>
+
+          <div class="editor-repeat-options" id="editorRepeatOptions">
+            <div>
+              <span class="editor-option-label">Repeat on</span>
+              <div class="editor-day-buttons" id="editorDayButtons">
+                <label><input type="checkbox" value="1" checked onchange="updateEditorScopePreview()"><span>Mon</span></label>
+                <label><input type="checkbox" value="2" checked onchange="updateEditorScopePreview()"><span>Tue</span></label>
+                <label><input type="checkbox" value="3" checked onchange="updateEditorScopePreview()"><span>Wed</span></label>
+                <label><input type="checkbox" value="4" checked onchange="updateEditorScopePreview()"><span>Thu</span></label>
+                <label><input type="checkbox" value="5" checked onchange="updateEditorScopePreview()"><span>Fri</span></label>
+                <label><input type="checkbox" value="6" checked onchange="updateEditorScopePreview()"><span>Sat</span></label>
+                <label><input type="checkbox" value="0" checked onchange="updateEditorScopePreview()"><span>Sun</span></label>
+              </div>
+              <div class="editor-day-presets">
+                <button onclick="setEditorDays('all')">All days</button>
+                <button onclick="setEditorDays('weekdays')">Mon–Fri</button>
+                <button onclick="setEditorDays('monsat')">Mon–Sat</button>
+              </div>
+            </div>
+            <div>
+              <span class="editor-option-label">On other days</span>
+              <div class="editor-apply-mode">
+                <label><input type="radio" name="editApplyMode" value="merge" checked onchange="updateEditorScopePreview()"><span><strong>Add safely</strong><small>Keep tasks already there</small></span></label>
+                <label><input type="radio" name="editApplyMode" value="replace" onchange="updateEditorScopePreview()"><span><strong>Replace day</strong><small>Use this exact schedule</small></span></label>
+              </div>
+            </div>
+          </div>
+          <div id="editorTargetPreview" class="editor-target-preview"></div>
+        </section>
+
+        <section class="editor-section">
+          <div class="editor-section-title"><span>2</span> Build the schedule</div>
+          <div id="editorTaskList" class="editor-task-list"></div>
+        </section>
+
+        <section class="editor-section editor-add-card" id="editorAddSection">
+          <div class="editor-section-title"><span>3</span> Add another task</div>
+          <div class="editor-idea-row">
+            <button onclick="useEditorIdea('deep')">🎯 Deep work</button>
+            <button onclick="useEditorIdea('quran')">📖 Quran</button>
+            <button onclick="useEditorIdea('workout')">💪 Workout</button>
+            <button onclick="useEditorIdea('study')">📚 Study</button>
+            <button onclick="useEditorIdea('plan')">🗓 Plan tomorrow</button>
+          </div>
+          <div class="editor-add-grid">
+            <input id="newTaskText" type="text" maxlength="160" placeholder="A clear next action…" onkeydown="if(event.key==='Enter'){event.preventDefault();addEditorTask();}">
+            <input id="newTaskTime" type="time" value="09:00">
+            <select id="newTaskCat">
+              <option value="work">💼 Work</option>
+              <option value="quran">📖 Quran</option>
+              <option value="gym">💪 Gym</option>
+              <option value="russian">🇷🇺 Russian</option>
+              <option value="finance">📊 Finance</option>
+              <option value="study">📚 Study</option>
+              <option value="content">🎬 Content</option>
+              <option value="business">🏢 Business</option>
+              <option value="plan">📋 Planning</option>
+            </select>
+            <select id="newTaskPoints" aria-label="Task points">
+              <option value="1">1 point · tiny</option>
+              <option value="2" selected>2 points · normal</option>
+              <option value="3">3 points · important</option>
+              <option value="4">4 points · deep work</option>
+              <option value="5">5 points · major</option>
+            </select>
+            <input id="newTaskUrl" type="url" placeholder="Optional link (https://…)">
+            <button class="editor-add-button" onclick="addEditorTask()">+ Add task</button>
+          </div>
+        </section>
       </div>
 
-      <!-- Apply scope -->
-      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
-        <label style="font-size:0.7rem;color:var(--muted);display:flex;align-items:center;gap:5px;cursor:pointer;">
-          <input type="radio" name="editScope" value="day" checked style="accent-color:var(--gold);"> This day only
-        </label>
-        <label style="font-size:0.7rem;color:var(--muted);display:flex;align-items:center;gap:5px;cursor:pointer;">
-          <input type="radio" name="editScope" value="weekdays"> All weekdays this week
-        </label>
-        <label style="font-size:0.7rem;color:var(--muted);display:flex;align-items:center;gap:5px;cursor:pointer;">
-          <input type="radio" name="editScope" value="month"> Rest of this month
-        </label>
-      </div>
-
-      <!-- Task list -->
-      <div id="editorTaskList" style="margin-bottom:14px;"></div>
-
-      <!-- Add task form -->
-      <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(201,168,76,0.12);border-radius:10px;padding:12px;margin-bottom:14px;">
-        <div style="font-size:0.7rem;font-weight:700;color:var(--gold);margin-bottom:8px;">+ Add Task</div>
-        <div style="display:grid;grid-template-columns:1fr 80px;gap:8px;margin-bottom:8px;">
-          <input id="newTaskText" type="text" placeholder="Task description…"
-            style="background:rgba(255,255,255,0.04);border:1px solid rgba(201,168,76,0.2);border-radius:6px;color:var(--text);padding:6px 10px;font-size:0.78rem;font-family:'DM Sans',sans-serif;">
-          <input id="newTaskTime" type="time" value="09:00"
-            style="background:rgba(255,255,255,0.04);border:1px solid rgba(201,168,76,0.2);border-radius:6px;color:var(--text);padding:6px 8px;font-size:0.78rem;font-family:'DM Sans',sans-serif;">
+      <footer class="task-editor-footer">
+        <div>
+          <div id="editorStatus" class="editor-status"></div>
+          <small id="editorSaveHint">Changes save automatically to the cloud.</small>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-          <select id="newTaskCat" style="background:rgba(20,20,26,0.9);border:1px solid rgba(201,168,76,0.2);border-radius:6px;color:var(--text);padding:6px 8px;font-size:0.78rem;font-family:'DM Sans',sans-serif;">
-            <option value="work">💼 Work</option>
-            <option value="quran">📖 Quran</option>
-            <option value="gym">💪 Gym</option>
-            <option value="finance">📊 Finance</option>
-            <option value="study">📚 Study</option>
-            <option value="content">🎬 Content</option>
-            <option value="business">🏢 Business</option>
-            <option value="plan">📋 Plan</option>
-            <option value="health">🏥 Health</option>
-          </select>
-          <button onclick="addEditorTask()" style="background:rgba(201,168,76,0.15);border:1px solid rgba(201,168,76,0.3);color:var(--gold);border-radius:6px;padding:6px;font-size:0.78rem;cursor:pointer;font-family:'DM Sans',sans-serif;">+ Add</button>
+        <div class="editor-footer-actions">
+          <button class="btn" onclick="closeDayEditor()">Cancel</button>
+          <button id="editorSaveButton" class="btn btn-gold" onclick="saveDayEdits()">Save this day</button>
         </div>
-      </div>
-
-      <!-- Save / AI Summary buttons -->
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button onclick="saveDayEdits()" style="flex:1;background:linear-gradient(135deg,rgba(201,168,76,0.3),rgba(201,168,76,0.15));border:1px solid rgba(201,168,76,0.5);color:var(--gold);padding:10px;border-radius:8px;font-size:0.82rem;font-weight:700;cursor:pointer;">💾 Save Tasks</button>
-        <button onclick="aiSummarizeWeek()" style="background:rgba(74,144,217,0.15);border:1px solid rgba(74,144,217,0.3);color:#4A90D9;padding:10px 14px;border-radius:8px;font-size:0.78rem;cursor:pointer;">🧠 AI Summary</button>
-      </div>
-      <div id="editorStatus" style="font-size:0.7rem;color:var(--muted);margin-top:8px;min-height:18px;"></div>
+      </footer>
     </div>
   </div>
 </div>
@@ -907,8 +963,9 @@ Broker kim? https://youtu.be/..."></textarea>
 </div>
 
 
-<script src="assets/js/config.js?v=3.1.0"></script>
-<script src="assets/js/app.js?v=3.1.0"></script>
+<script src="assets/js/config.js?v=3.2.0"></script>
+<script src="assets/js/task-schedule-utils.js?v=3.2.0"></script>
+<script src="assets/js/app.js?v=3.2.0"></script>
 
 
 <!-- ── AI Coach Chat Widget ───────────────────────────────────────────────── -->
@@ -942,8 +999,8 @@ Broker kim? https://youtu.be/..."></textarea>
   </div>
 </div>
 
-<script src="assets/js/ai-coach.js?v=3.1.0"></script>
-<script src="assets/js/notifications.js?v=3.1.0"></script>
-<script type="module" src="assets/js/firebase-storage.js?v=3.1.0"></script>
+<script src="assets/js/ai-coach.js?v=3.2.0"></script>
+<script src="assets/js/notifications.js?v=3.2.0"></script>
+<script type="module" src="assets/js/firebase-storage.js?v=3.2.0"></script>
 </body>
 </html>

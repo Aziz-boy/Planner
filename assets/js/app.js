@@ -3565,6 +3565,7 @@ function mergeStudyTask(date, baseTasks) {
 // ═══════════════════════════════════════════════════════════════════
 let customTasks = {}; // { 'YYYY-MM-DD': [{id,cat,text,time,pts,url}] }
 let _editorTasks = []; // working copy while editor is open
+let _editorLocked = false;
 
 function _isLocked(date) {
   // Past dates (before today midnight Tashkent) are always locked
@@ -3579,8 +3580,12 @@ window.getTasksForDate = getTasksForDate; // keep reference
   const _orig = getTasksForDate;
   getTasksForDate = function(date) {
     const dk = dateKey(date);
-    if (customTasks[dk] && customTasks[dk].length > 0) {
-      return (typeof mergeStudyTask === 'function') ? mergeStudyTask(date, customTasks[dk]) : customTasks[dk];
+    // An explicitly saved empty array means "no tasks". Checking `.length`
+    // made a cleared day silently fall back to the default schedule.
+    if (Object.prototype.hasOwnProperty.call(customTasks, dk)) {
+      const savedTasks = customTasks[dk];
+      if (!savedTasks.length) return [];
+      return (typeof mergeStudyTask === 'function') ? mergeStudyTask(date, savedTasks) : savedTasks;
     }
     return _orig(date);
   };
@@ -3588,94 +3593,212 @@ window.getTasksForDate = getTasksForDate; // keep reference
 
 function openDayEditor() {
   const d = curDate;
-  if (_isLocked(d)) {
-    // Past — show read-only view with lock message
-    document.getElementById('editorDateLabel').textContent =
-      DAYS_FULL[d.getUTCDay()] + ', ' + d.getUTCDate() + ' ' + MONTHS_SHORT[d.getUTCMonth()+1] + ' · 🔒 Locked (past date)';
-    _editorTasks = getTasksForDate(d).map(t => ({...t}));
-    _renderEditorList(true);
-    document.querySelectorAll('[name="editScope"]').forEach(r => r.disabled = true);
-    document.getElementById('dayEditor').style.display = 'block';
-    return;
-  }
+  const editor = document.getElementById('dayEditor');
+  _editorLocked = _isLocked(d);
+  _editorTasks = getTasksForDate(d).map(task => ({ ...task }));
+
   document.getElementById('editorDateLabel').textContent =
-    DAYS_FULL[d.getUTCDay()] + ', ' + d.getUTCDate() + ' ' + MONTHS_SHORT[d.getUTCMonth()+1] + ' — tap a task to remove it';
-  _editorTasks = getTasksForDate(d).map(t => ({...t})); // clone
-  document.querySelectorAll('[name="editScope"]').forEach(r => r.disabled = false);
-  _renderEditorList(false);
+    `${DAYS_FULL[d.getUTCDay()]}, ${d.getUTCDate()} ${MONTHS_FULL[d.getUTCMonth()+1]} ${d.getUTCFullYear()}` +
+    (_editorLocked ? ' · Locked because this date is in the past' : ' · Edit, reorder, or repeat this schedule');
+  document.querySelector('[name="editScope"][value="day"]').checked = true;
+  document.querySelector('[name="editApplyMode"][value="merge"]').checked = true;
+  document.querySelectorAll('#editorDayButtons input').forEach(input => { input.checked = true; });
   document.getElementById('editorStatus').textContent = '';
-  document.getElementById('dayEditor').style.display = 'block';
+  editor.classList.toggle('locked', _editorLocked);
+  editor.style.display = 'block';
+  document.body.style.overflow = 'hidden';
+  _renderEditorList(_editorLocked);
+  updateEditorScopePreview();
+  if (!_editorLocked) setTimeout(() => document.getElementById('newTaskText')?.focus(), 50);
 }
 
 function closeDayEditor() {
   document.getElementById('dayEditor').style.display = 'none';
+  document.body.style.overflow = '';
 }
 
 function _renderEditorList(locked) {
-  const CATS_LOCAL = typeof CATS !== 'undefined' ? CATS : {};
   document.getElementById('editorTaskList').innerHTML = _editorTasks.map((t,i) => {
-    const c = CATS_LOCAL[t.cat] || {color:'#888'};
-    return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;margin-bottom:5px;background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.06);">
-      <div style="width:8px;height:8px;border-radius:50%;background:${c.color};flex-shrink:0;"></div>
-      <div style="font-size:0.65rem;color:var(--muted);min-width:38px;">${t.time||''}</div>
-      <div style="flex:1;font-size:0.78rem;color:var(--text);">${t.text}</div>
-      ${!locked ? `<button onclick="_removeEditorTask(${i})" style="background:rgba(217,74,74,0.15);border:none;color:#D94A4A;border-radius:5px;padding:2px 8px;font-size:0.65rem;cursor:pointer;">✕</button>` : ''}
+    const category = getCategoryMeta(t.cat);
+    const disabled = locked ? ' disabled' : '';
+    const categoryOptions = Object.entries(CATS).map(([key, meta]) =>
+      `<option value="${key}"${category.key === key ? ' selected' : ''}>${escapeHTML(meta.label)}</option>`
+    ).join('');
+    const pointOptions = [1,2,3,4,5].map(points =>
+      `<option value="${points}"${taskPoints(t) === points ? ' selected' : ''}>${points} pt${points === 1 ? '' : 's'}</option>`
+    ).join('');
+    return `<div class="editor-task-row" style="border-left:3px solid ${category.color};">
+      <input type="time" value="${escapeHTML(t.time || '09:00')}" aria-label="Task time" onchange="_updateEditorTask(${i},'time',this.value)"${disabled}>
+      <input type="text" value="${escapeHTML(t.text || '')}" maxlength="160" aria-label="Task description" onchange="_updateEditorTask(${i},'text',this.value)"${disabled}>
+      <select class="editor-task-cat" aria-label="Task category" onchange="_updateEditorTask(${i},'cat',this.value)"${disabled}>${categoryOptions}</select>
+      <select class="editor-task-points" aria-label="Task points" onchange="_updateEditorTask(${i},'pts',this.value)"${disabled}>${pointOptions}</select>
+      ${locked ? '<span></span>' : `<button class="editor-task-remove" onclick="_removeEditorTask(${i})" aria-label="Remove ${escapeHTML(t.text || 'task')}">✕</button>`}
     </div>`;
-  }).join('') || `<div style="font-size:0.78rem;color:var(--muted);text-align:center;padding:20px;">No tasks for this day</div>`;
+  }).join('') || `<div class="editor-task-empty">No tasks yet. Add one below, or save this day empty.</div>`;
+}
+
+function _updateEditorTask(index, field, value) {
+  if (_editorLocked || !_editorTasks[index]) return;
+  _editorTasks[index][field] = field === 'pts' ? Math.max(1, Math.min(5, Number(value) || 1)) : value;
+  _editorTasks.sort((a,b) => String(a.time || '').localeCompare(String(b.time || '')));
+  if (field === 'time') _renderEditorList(false);
 }
 
 function _removeEditorTask(idx) {
+  if (_editorLocked) return;
   _editorTasks.splice(idx, 1);
   _renderEditorList(false);
+  updateEditorScopePreview();
 }
 
 function addEditorTask() {
+  if (_editorLocked) return;
   const text = document.getElementById('newTaskText').value.trim();
-  if (!text) return;
+  const status = document.getElementById('editorStatus');
+  if (!text) {
+    status.textContent = 'Write a clear task description first.';
+    document.getElementById('newTaskText').focus();
+    return;
+  }
   const time = document.getElementById('newTaskTime').value || '09:00';
   const cat  = document.getElementById('newTaskCat').value;
-  const id   = 'custom_' + Date.now();
-  _editorTasks.push({ id, cat, text, time, pts: 2 });
+  const pts  = Number(document.getElementById('newTaskPoints').value) || 2;
+  const rawUrl = document.getElementById('newTaskUrl').value.trim();
+  const url = rawUrl && /^https?:\/\//i.test(rawUrl) ? safeHttpUrl(rawUrl) : '';
+  if (rawUrl && !url) {
+    status.textContent = 'The optional link must start with http:// or https://';
+    return;
+  }
+  const id = `custom_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
+  _editorTasks.push({ id, cat, text: text.slice(0,160), time, pts, ...(url ? { url } : {}) });
   // Sort by time
   _editorTasks.sort((a,b) => (a.time||'00:00').localeCompare(b.time||'00:00'));
   _renderEditorList(false);
   document.getElementById('newTaskText').value = '';
+  document.getElementById('newTaskUrl').value = '';
+  status.textContent = `Added “${text.slice(0,45)}${text.length > 45 ? '…' : ''}”`;
+  updateEditorScopePreview();
+  document.getElementById('newTaskText').focus();
+}
+
+function useEditorIdea(kind) {
+  const ideas = {
+    deep:    { text:'90-minute deep work block', cat:'work', time:'09:00', pts:4 },
+    quran:   { text:'Quran — read, memorize, and review', cat:'quran', time:'07:00', pts:2 },
+    workout: { text:'Workout — complete today\'s session', cat:'gym', time:'18:00', pts:3 },
+    study:   { text:'Focused study and short review notes', cat:'study', time:'20:00', pts:2 },
+    plan:    { text:'Plan tomorrow — choose the top 3 actions', cat:'plan', time:'21:30', pts:1 },
+  };
+  const idea = ideas[kind] || ideas.deep;
+  document.getElementById('newTaskText').value = idea.text;
+  document.getElementById('newTaskCat').value = idea.cat;
+  document.getElementById('newTaskTime').value = idea.time;
+  document.getElementById('newTaskPoints').value = String(idea.pts);
+  document.getElementById('newTaskText').focus();
+}
+
+function setEditorDays(preset) {
+  const allowed = preset === 'weekdays' ? new Set([1,2,3,4,5])
+    : preset === 'monsat' ? new Set([1,2,3,4,5,6])
+      : new Set([0,1,2,3,4,5,6]);
+  document.querySelectorAll('#editorDayButtons input').forEach(input => {
+    input.checked = allowed.has(Number(input.value));
+  });
+  updateEditorScopePreview();
+}
+
+function _editorTargetDates() {
+  const scope = document.querySelector('[name="editScope"]:checked')?.value || 'day';
+  const selectedDays = new Set(
+    Array.from(document.querySelectorAll('#editorDayButtons input:checked')).map(input => Number(input.value))
+  );
+  return window.PlannerTaskSchedule
+    .getRepeatDateKeys(dateKey(curDate), scope, [...selectedDays], dateKey(END))
+    .map(key => new Date(key));
+}
+
+function updateEditorScopePreview() {
+  const scope = document.querySelector('[name="editScope"]:checked')?.value || 'day';
+  const mode = document.querySelector('[name="editApplyMode"]:checked')?.value || 'merge';
+  const repeatOptions = document.getElementById('editorRepeatOptions');
+  const preview = document.getElementById('editorTargetPreview');
+  const saveButton = document.getElementById('editorSaveButton');
+  repeatOptions?.classList.toggle('is-disabled', scope === 'day' || _editorLocked);
+
+  if (_editorLocked) {
+    preview.className = 'editor-target-preview';
+    preview.textContent = 'Past dates are read-only. You can review this schedule but cannot change it.';
+    saveButton.disabled = true;
+    saveButton.textContent = 'Locked';
+    return;
+  }
+
+  const dates = _editorTargetDates();
+  if (!dates.length) {
+    preview.className = 'editor-target-preview error';
+    preview.textContent = 'No dates match your selected days. Choose at least one day that occurs in this range.';
+    saveButton.disabled = true;
+    saveButton.textContent = 'Choose target days';
+    return;
+  }
+
+  const first = dates[0], last = dates[dates.length - 1];
+  const rangeLabel = dates.length === 1
+    ? `${DAYS_FULL[first.getUTCDay()]}, ${first.getUTCDate()} ${MONTHS_SHORT[first.getUTCMonth()+1]}`
+    : `${first.getUTCDate()} ${MONTHS_SHORT[first.getUTCMonth()+1]} → ${last.getUTCDate()} ${MONTHS_SHORT[last.getUTCMonth()+1]}`;
+  const behavior = scope === 'day' ? 'This schedule will only change the selected day.'
+    : mode === 'merge'
+      ? 'Existing tasks on other days will stay; matching tasks will not be duplicated.'
+      : 'Each target day will be replaced with this exact schedule.';
+  preview.className = 'editor-target-preview';
+  preview.textContent = `${dates.length} target day${dates.length === 1 ? '' : 's'} · ${rangeLabel}. ${behavior}`;
+  saveButton.disabled = false;
+  saveButton.textContent = dates.length === 1 ? 'Save 1 day' : `Save to ${dates.length} days`;
+}
+
+function _copyEditorTasks(tasks) {
+  return tasks.map(task => ({ ...task, pts: taskPoints(task), cat: getCategoryMeta(task.cat).key }));
+}
+
+function _mergeEditorSchedule(date, incomingTasks) {
+  const key = dateKey(date);
+  return window.PlannerTaskSchedule.mergeSchedules(getTasksForDate(date), incomingTasks, key);
 }
 
 function saveDayEdits() {
-  const scope = document.querySelector('[name="editScope"]:checked')?.value || 'day';
-  const d     = curDate;
-  const st    = document.getElementById('editorStatus');
-
-  if (scope === 'day') {
-    customTasks[dateKey(d)] = [..._editorTasks];
-  } else if (scope === 'weekdays') {
-    // Apply to all remaining weekdays (Mon–Sat) of this week from today onwards
-    const today = new Date(tashKey());
-    const mon   = getMonday(d);
-    for (let i=0; i<7; i++) {
-      const day = addDays(mon, i);
-      const dk  = dateKey(day);
-      if (day >= today && day.getUTCDay() !== 0) { // skip past and Sundays
-        customTasks[dk] = [..._editorTasks];
-      }
-    }
-  } else if (scope === 'month') {
-    // Apply to all remaining days this month
-    const today = new Date(tashKey());
-    const mEnd  = utcDate(d.getUTCFullYear(), d.getUTCMonth()+1, 0);
-    let cur     = new Date(today);
-    while (cur <= mEnd) {
-      if (cur.getUTCDay() !== 0) customTasks[dateKey(cur)] = [..._editorTasks];
-      cur = addDays(cur, 1);
-    }
+  const status = document.getElementById('editorStatus');
+  if (_editorLocked || _isLocked(curDate)) {
+    status.textContent = 'This past date is locked.';
+    return;
   }
+  const scope = document.querySelector('[name="editScope"]:checked')?.value || 'day';
+  const mode = document.querySelector('[name="editApplyMode"]:checked')?.value || 'merge';
+  const dates = _editorTargetDates();
+  if (!dates.length) {
+    updateEditorScopePreview();
+    return;
+  }
+  const template = _copyEditorTasks(_editorTasks);
+  const selectedKey = dateKey(curDate);
+
+  dates.forEach(date => {
+    const key = dateKey(date);
+    // The selected day is always saved exactly so edits and removals work.
+    // Other days merge by default, unless the user explicitly chooses replace.
+    customTasks[key] = (scope === 'day' || key === selectedKey || mode === 'replace')
+      ? _copyEditorTasks(template)
+      : _mergeEditorSchedule(date, template);
+  });
 
   window._customTasks = customTasks;
   scheduleSave();
-  st.textContent = '✅ Saved! Tasks updated.';
-  setTimeout(() => { closeDayEditor(); renderAll(); }, 800);
+  status.textContent = `Saved ${_editorTasks.length} task${_editorTasks.length === 1 ? '' : 's'} across ${dates.length} day${dates.length === 1 ? '' : 's'} ✓`;
+  setTimeout(() => { closeDayEditor(); renderAll(); }, 900);
 }
+
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && document.getElementById('dayEditor')?.style.display !== 'none') closeDayEditor();
+});
 
 async function aiSummarizeWeek() {
   const st = document.getElementById('editorStatus');

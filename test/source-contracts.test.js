@@ -48,6 +48,21 @@ test('focus experience reduces the main navigation and supports minimum days', (
   assert.match(app, /function quickAddTodayTask/);
 });
 
+test('task editor repeats safely without losing empty or existing days', () => {
+  const html = read('index.html');
+  const app = read('assets/js/app.js');
+  assert.match(html, /value="week"/);
+  assert.match(html, /value="next7"/);
+  assert.match(html, /value="month"/);
+  assert.match(html, /value="merge"/);
+  assert.match(html, /value="replace"/);
+  assert.match(app, /Object\.prototype\.hasOwnProperty\.call\(customTasks, dk\)/);
+  assert.match(app, /if \(!savedTasks\.length\) return \[\]/);
+  assert.match(app, /PlannerTaskSchedule\s*\.getRepeatDateKeys/);
+  assert.match(app, /PlannerTaskSchedule\.mergeSchedules/);
+  assert.doesNotMatch(app, /scope === 'weekdays'/);
+});
+
 test('AI Coach can prioritize live planner data from focus shortcuts', () => {
   const coach = read('assets/js/ai-coach.js');
   assert.match(coach, /window\.openAiCoach/);
